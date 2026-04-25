@@ -99,35 +99,37 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, y: -20 }}
-              className="text-center py-12"
+              className="text-center pt-20 pb-24"
             >
-              {/* Badge */}
+              {/* Badge — tight lead-in to headline */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-6 tracking-wide"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-5 tracking-wide"
               >
                 <Sparkles className="w-3 h-3" />
                 Metro Manila weekend planner
               </motion.div>
 
+              {/* Headline — medium gap to subtitle */}
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-balance leading-tight"
+                className="text-4xl md:text-5xl font-bold text-foreground mb-6 text-balance leading-tight"
               >
                 Your AI Chief-of-Staff
                 <br />
                 <span className="text-primary">for Free Time</span>
               </motion.h1>
 
+              {/* Subtitle — generous gap before CTA (the key action) */}
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-lg text-muted-foreground mb-10 max-w-sm mx-auto text-pretty"
+                className="text-lg text-muted-foreground mb-12 max-w-md mx-auto text-pretty"
               >
                 Tell us your vibe, budget, and crew. Get a timed, weather-aware
                 itinerary in seconds.
@@ -152,12 +154,12 @@ export default function Home() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="mt-14 flex items-center justify-center gap-1 text-sm text-muted-foreground flex-wrap"
+                className="mt-16 flex items-center justify-center gap-2 text-sm text-muted-foreground flex-wrap"
               >
                 {FEATURES.map((f, i) => (
                   <span key={f.label} className="inline-flex items-center gap-1.5">
                     {i > 0 && (
-                      <span className="mx-2 text-border select-none">·</span>
+                      <span className="mr-1 text-border/60 select-none" aria-hidden>·</span>
                     )}
                     <span aria-hidden>{f.icon}</span>
                     {f.label}

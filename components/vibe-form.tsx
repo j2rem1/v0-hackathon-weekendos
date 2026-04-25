@@ -52,10 +52,10 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
       onSubmit={handleSubmit}
-      className="w-full max-w-lg mx-auto space-y-6"
+      className="w-full max-w-lg mx-auto"
     >
-      {/* Vibe Input */}
-      <div className="space-y-3">
+      {/* Vibe Input — primary field, most breathing room after */}
+      <div className="mb-10 space-y-3">
         <label className="text-sm font-medium text-foreground/80">
           What&apos;s your vibe?
         </label>
@@ -65,7 +65,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
           placeholder="rainy Saturday, ₱3000 budget, with my partner, want food and something weird..."
           className="min-h-[100px] text-base resize-none bg-card border-border/50 focus:border-primary/50 transition-colors"
         />
-        
+
         {/* Quick Vibe Pills */}
         <div className="flex flex-wrap gap-2">
           {QUICK_VIBES.map((quickVibe) => (
@@ -82,7 +82,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
       </div>
 
       {/* Budget Slider */}
-      <div className="space-y-3">
+      <div className="mb-7 space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
             <Wallet className="w-4 h-4" />
@@ -107,7 +107,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
       </div>
 
       {/* Party Size */}
-      <div className="space-y-3">
+      <div className="mb-7 space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
             <Users className="w-4 h-4" />
@@ -135,8 +135,8 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
         </div>
       </div>
 
-      {/* Time Range */}
-      <div className="space-y-3">
+      {/* Time Range — tertiary, tightest spacing */}
+      <div className="mb-5 space-y-2">
         <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
           <Clock className="w-4 h-4" />
           Time window
@@ -148,7 +148,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
             onChange={(e) => setStartTime(e.target.value)}
             className="flex-1 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm"
           />
-          <span className="text-muted-foreground">to</span>
+          <span className="text-muted-foreground text-sm">to</span>
           <input
             type="time"
             value={endTime}
@@ -162,7 +162,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
       <Button
         type="submit"
         disabled={!vibe.trim() || isLoading}
-        className="w-full h-12 text-base font-semibold gap-2"
+        className="w-full h-12 text-base font-semibold gap-2 mt-8"
       >
         <Sparkles className="w-5 h-5" />
         {isLoading ? "Planning..." : "Plan my weekend"}
