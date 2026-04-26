@@ -8,7 +8,15 @@ const AWARD_KEYWORDS = [
   "zagat", "james beard", "bib gourmand",
 ];
 
-async function fetchQuery(key: string, query: string): Promise<any[]> {
+interface RawPack {
+  title: string;
+  rating?: number;
+  rating_vote_count?: number;
+  details?: string[];
+  position?: number;
+}
+
+async function fetchQuery(key: string, query: string): Promise<RawPack[]> {
   const url = new URL(SCRAPERAPI_BASE);
   url.searchParams.set("api_key", key);
   url.searchParams.set("query", query);
@@ -18,38 +26,43 @@ async function fetchQuery(key: string, query: string): Promise<any[]> {
   try {
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) {
-      console.error("[search] ScraperAPI error:", res.status);
+      console.error(`[search] "${query}" → HTTP ${res.status}`);
       return [];
     }
     const data = await res.json();
-    const packs: any[] = data.local_packs ?? [];
-    return packs.flatMap((p: any) => p.locals ?? p.results ?? [p]).filter((r: any) => r.title);
-  } catch {
+    const packs: RawPack[] = (data.local_packs ?? []).filter((p: any) => p?.title);
+    console.log(`[search] "${query}" → ${packs.length} packs`);
+    return packs;
+  } catch (err) {
+    console.error(`[search] "${query}" failed:`, err);
     return [];
   }
 }
 
 export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
   const key = process.env.SCRAPERAPI_KEY;
-  if (!key) {
-    console.log("[search] SCRAPERAPI_KEY not set — using seeded venues");
-    return [];
-  }
+  if (!key) throw new Error("SCRAPERAPI_KEY is not set");
 
   const queries = buildQueries(vibe);
+  console.log(`[search] firing ${queries.length} queries for vibe: "${vibe}"`);
+
   const batches = await Promise.all(queries.map((q) => fetchQuery(key, q)));
+
   const seen = new Set<string>();
-  const results: any[] = [];
+  const merged: RawPack[] = [];
   for (const batch of batches) {
     for (const r of batch) {
-      const key = r.title.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); results.push(r); }
+      const k = r.title.toLowerCase().trim();
+      if (!seen.has(k)) {
+        seen.add(k);
+        merged.push(r);
+      }
     }
   }
 
-  console.log(`[search] ScraperAPI returned ${results.length} deduplicated results`);
-  return results
-    .slice(0, 16)
+  console.log(`[search] merged ${merged.length} unique venues from ScraperAPI`);
+
+  return merged
     .map((r, i) => mapToVenue(r, i))
     .filter((v): v is Venue => v !== null);
 }
@@ -59,79 +72,134 @@ function buildQueries(vibe: string): string[] {
   const modifiers: string[] = [];
 
   if (/date|romantic|partner/.test(lower)) modifiers.push("romantic");
-  if (/weird|unique|different/.test(lower)) modifiers.push("unique hidden gems");
-  if (/group|friends|barkada/.test(lower)) modifiers.push("group-friendly");
-  if (/cheap|budget/.test(lower)) modifiers.push("affordable");
-  if (/upscale|fancy/.test(lower)) modifiers.push("upscale fine dining");
-  if (/trending|popular|viral/.test(lower)) modifiers.push("trending popular");
+  if (/weird|unique|different|hidden/.test(lower)) modifiers.push("hidden gems unique");
+  if (/group|friends|barkada/.test(lower)) modifiers.push("group friendly");
+  if (/cheap|budget|affordable/.test(lower)) modifiers.push("affordable cheap eats");
+  if (/upscale|fancy|luxury/.test(lower)) modifiers.push("upscale fine dining");
+  if (/trending|popular|viral|hyped/.test(lower)) modifiers.push("trending popular");
 
-  const suffix = [...modifiers, "Metro Manila Philippines"].join(" ");
+  const mod = modifiers.length ? modifiers.join(" ") + " " : "";
+  const region = "Metro Manila Philippines";
 
-  // First query: dining/nightlife. Second: experiences/culture/nature.
-  const q1Types: string[] = [];
-  if (/food|eat|hungry|foodie/.test(lower)) q1Types.push("restaurants");
-  if (/bar|night|drink|party|cocktail/.test(lower)) q1Types.push("bars");
-  if (/coffee|cafe|chill/.test(lower)) q1Types.push("cafes");
-  if (q1Types.length === 0) q1Types.push("restaurants cafes");
+  // Always fire a broad baseline so the pool is never empty regardless of vibe.
+  const queries = new Set<string>([
+    `best ${mod}restaurants ${region}`,
+    `best ${mod}cafes ${region}`,
+    `best ${mod}bars ${region}`,
+    `things to do ${region}`,
+  ]);
 
-  const q2Types: string[] = [];
-  if (/art|museum|culture/.test(lower)) q2Types.push("museums galleries");
-  if (/nature|outdoor|park|escape/.test(lower)) q2Types.push("parks nature spots");
-  if (/shop|vintage|thrift/.test(lower)) q2Types.push("shops boutiques");
-  if (q2Types.length === 0) q2Types.push("things to do attractions");
+  // Add vibe-targeted queries
+  if (/food|eat|hungry|foodie|brunch/.test(lower)) {
+    queries.add(`best ${mod}brunch spots ${region}`);
+  }
+  if (/bar|night|drink|cocktail|party/.test(lower)) {
+    queries.add(`best ${mod}cocktail bars Poblacion Makati`);
+  }
+  if (/coffee|cafe|chill/.test(lower)) {
+    queries.add(`best specialty coffee shops ${region}`);
+  }
+  if (/art|museum|culture|gallery/.test(lower)) {
+    queries.add(`best museums galleries ${region}`);
+  }
+  if (/nature|outdoor|park|escape|hike/.test(lower)) {
+    queries.add(`best parks nature spots ${region}`);
+  }
+  if (/shop|vintage|thrift|market/.test(lower)) {
+    queries.add(`best shops boutiques markets ${region}`);
+  }
+  if (/rain|wet|stormy|typhoon|indoor/.test(lower)) {
+    queries.add(`best indoor activities ${region}`);
+  }
 
-  return [
-    `${q1Types.join(" ")} ${suffix}`,
-    `${q2Types.join(" ")} ${suffix}`,
-  ];
+  return Array.from(queries);
 }
 
-function detailsRaw(result: any): string {
-  const details: string[] = Array.isArray(result.details) ? result.details : [];
-  return [result.type ?? "", result.description ?? "", ...details].join(" ").toLowerCase();
+const TYPE_KEYWORDS: { type: VenueType; words: string[] }[] = [
+  { type: "night",   words: ["bar", "pub", "club", "cocktail", "lounge", "speakeasy", "nightclub", "brewery"] },
+  { type: "culture", words: ["museum", "gallery", "exhibit", "theater", "theatre", "heritage", "cultural"] },
+  { type: "outdoor", words: ["park", "garden", "trail", "zoo", "farm", "nature reserve", "botanical"] },
+  { type: "shop",    words: ["boutique", "vintage shop", "thrift", "market", "bazaar", "concept store"] },
+  { type: "food",    words: ["restaurant", "cafe", "café", "coffee", "bakery", "eatery", "bistro", "diner",
+                              "filipino", "japanese", "korean", "italian", "chinese", "thai", "vietnamese",
+                              "mexican", "spanish", "french", "american", "fusion", "ramen", "sushi",
+                              "pizzeria", "bbq", "steakhouse", "seafood", "vegetarian", "vegan", "brunch"] },
+];
+
+// Patterns intentionally omit leading word boundaries — ScraperAPI concats
+// detail strings without spaces ("RestaurantQuezon City, Metro Manila").
+const AREA_KEYWORDS: { area: string; pattern: RegExp }[] = [
+  { area: "BGC",          pattern: /(bgc|bonifacio global city|fort bonifacio)/i },
+  { area: "Makati",       pattern: /(makati|salcedo|legaspi|poblacion|rockwell)/i },
+  { area: "QC",           pattern: /(quezon city|cubao|maginhawa|katipunan|diliman|fairview|tomas morato|timog)/i },
+  { area: "Taguig",       pattern: /taguig/i },
+  { area: "Antipolo",     pattern: /antipolo/i },
+  { area: "Pasig",        pattern: /(pasig|kapitolyo|capitol commons|ortigas)/i },
+  { area: "Pasay",        pattern: /(pasay|mall of asia)/i },
+  { area: "Mandaluyong",  pattern: /mandaluyong/i },
+  { area: "San Juan",     pattern: /san juan/i },
+  { area: "Manila",       pattern: /(ermita|malate|intramuros|binondo|escolta|chinatown|manila)/i },
+];
+
+interface ParsedDetails {
+  haystack: string;
+  priceLine: string;
+  quote: string;
 }
 
-function inferType(result: any): VenueType {
-  const raw = detailsRaw(result);
-  if (/restaurant|food|dining|cuisine|cafe|coffee|bakery|eatery/.test(raw)) return "food";
-  if (/museum|gallery|art|exhibit|cultural|heritage/.test(raw)) return "culture";
-  if (/park|nature|garden|eco|outdoor|trail/.test(raw)) return "outdoor";
-  if (/bar|club|pub|cocktail|lounge|nightlife/.test(raw)) return "night";
-  if (/shop|store|mall|market|boutique|vintage/.test(raw)) return "shop";
+function parseDetails(result: RawPack): ParsedDetails {
+  const details = result.details ?? [];
+
+  // Strip the "<title><rating>(<votes>)" header from details[0]
+  const stripped = details.map((d, i) => {
+    if (i === 0 && d.toLowerCase().startsWith(result.title.toLowerCase())) {
+      return d.slice(result.title.length).replace(/^\s*\d+(?:\.\d+)?\s*\(\s*[\d.]+K?\s*\)\s*/i, "").trim();
+    }
+    return d;
+  });
+
+  const haystack = stripped.join(" ").trim();
+  const priceLine = stripped.find((d) => /₱[\d,]/.test(d)) ?? "";
+  const quote = haystack.match(/"([^"]+)"/)?.[1] ?? "";
+
+  return { haystack, priceLine, quote };
+}
+
+function inferType(haystack: string): VenueType {
+  const t = haystack.toLowerCase();
+  for (const { type, words } of TYPE_KEYWORDS) {
+    if (words.some((w) => t.includes(w))) return type;
+  }
   return "food";
 }
 
-function inferVibes(result: any, type: VenueType): Vibe[] {
-  const raw = detailsRaw(result);
+function inferVibes(raw: string, type: VenueType, price: string): Vibe[] {
   const vibes: Vibe[] = [];
 
   if (type === "food") vibes.push("foodie");
-  if (/coffee|cafe/.test(raw)) vibes.push("coffee");
-  if (/romantic|intimate|couples/.test(raw) || type === "night") vibes.push("date");
-  if (/art|gallery/.test(raw)) vibes.push("art");
-  const price = result.price ?? (raw.match(/(\$+)/)?.[1] ?? "");
-  if (price === "$$$" || price === "$$$$") vibes.push("upscale");
-  if (price === "$") vibes.push("cheap");
+  if (/coffee|cafe|espresso|latte/.test(raw)) vibes.push("coffee");
+  if (/romantic|intimate|couples|date/.test(raw) || type === "night") vibes.push("date");
+  if (/art|gallery|museum/.test(raw)) vibes.push("art");
+  if (price.includes("2,000") || price.includes("2000") || /upscale|fine dining/.test(raw)) vibes.push("upscale");
+  if (price.includes("200") && !price.includes("2,000") && !price.includes("2000")) vibes.push("cheap");
   if (/brunch|breakfast/.test(raw)) vibes.push("brunch");
-  if (/casual/.test(raw)) vibes.push("casual");
-  if (/family/.test(raw)) vibes.push("family");
-  if (/chill|relax/.test(raw) || type === "outdoor") vibes.push("chill");
+  if (/casual|laid.?back/.test(raw)) vibes.push("casual");
+  if (/family|kid/.test(raw)) vibes.push("family");
+  if (/chill|relax|cozy/.test(raw) || type === "outdoor") vibes.push("chill");
   if (type === "outdoor") { vibes.push("escape"); vibes.push("nature"); }
   if (type === "shop") vibes.push("aesthetic");
   if (/vintage|antique|thrift/.test(raw)) vibes.push("vintage");
   if (/interactive|hands.on/.test(raw)) vibes.push("interactive");
-  if (/group|barkada/.test(raw)) vibes.push("group");
+  if (/group|barkada|sharing/.test(raw)) vibes.push("group");
   if (/cocktail/.test(raw)) vibes.push("cocktails");
-  if (/party/.test(raw)) vibes.push("party");
+  if (/party|club|dance/.test(raw)) vibes.push("party");
   if (/active|sport|fitness/.test(raw)) vibes.push("active");
 
   return [...new Set(vibes)];
 }
 
-function detectAwards(result: any): string[] {
-  const haystack = detailsRaw(result);
-
-  return AWARD_KEYWORDS.filter((kw) => haystack.includes(kw)).map((kw) => {
+function detectAwards(raw: string): string[] {
+  return AWARD_KEYWORDS.filter((kw) => raw.includes(kw)).map((kw) => {
     const labels: Record<string, string> = {
       "michelin": "Michelin",
       "asia's 50 best": "Asia's 50 Best",
@@ -144,35 +212,25 @@ function detectAwards(result: any): string[] {
   });
 }
 
-function priceToCost(price: string | undefined): number {
-  const map: Record<string, number> = { "$": 250, "$$": 600, "$$$": 1400, "$$$$": 2500 };
-  return map[price ?? ""] ?? 500;
+// Parse "₱500–1,000" → midpoint as PHP per person. Only digits AFTER ₱ count.
+function priceToCost(price: string, type: VenueType): number {
+  const m = price.match(/₱\s*([\d,]+)(?:\s*[–-]\s*([\d,]+))?/);
+  const fallback: Record<VenueType, number> = { food: 500, night: 700, culture: 200, outdoor: 100, shop: 400 };
+  if (!m) return fallback[type];
+  const lo = parseInt(m[1].replace(/,/g, ""), 10);
+  const hi = m[2] ? parseInt(m[2].replace(/,/g, ""), 10) : lo;
+  if (isNaN(lo)) return fallback[type];
+  return Math.round((lo + (isNaN(hi) ? lo : hi)) / 2);
 }
 
-function inferArea(address: string): string {
-  if (/bgc|bonifacio|fort taguig/i.test(address)) return "BGC";
-  if (/makati|salcedo|legaspi|poblacion|ayala/i.test(address)) return "Makati";
-  if (/quezon|qc|cubao|maginhawa|katipunan|diliman|fairview/i.test(address)) return "QC";
-  if (/antipolo/i.test(address)) return "Antipolo";
-  return "Makati";
-}
-
-function inferHours(result: any, type: VenueType): { opens: string; closes: string } {
-  const details: string[] = Array.isArray(result.details) ? result.details : [];
-  const hoursStr: string = result.hours ?? details.find((d: string) => /open|close|am|pm/i.test(d)) ?? "";
-  const closeMatch = hoursStr.match(/closes?\s+(\d+)(?::(\d+))?\s*(am|pm)/i);
-  if (closeMatch) {
-    let hour = parseInt(closeMatch[1]);
-    const mins = closeMatch[2] ? parseInt(closeMatch[2]) : 0;
-    const period = closeMatch[3].toLowerCase();
-    if (period === "pm" && hour !== 12) hour += 12;
-    if (period === "am" && hour === 12) hour = 0;
-    return {
-      opens: "09:00",
-      closes: `${hour.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`,
-    };
+function inferArea(haystack: string): string {
+  for (const { area, pattern } of AREA_KEYWORDS) {
+    if (pattern.test(haystack)) return area;
   }
+  return "Metro Manila";
+}
 
+function defaultHours(type: VenueType): { opens: string; closes: string } {
   const defaults: Record<VenueType, { opens: string; closes: string }> = {
     food:    { opens: "10:00", closes: "22:00" },
     culture: { opens: "09:00", closes: "18:00" },
@@ -183,33 +241,36 @@ function inferHours(result: any, type: VenueType): { opens: string; closes: stri
   return defaults[type];
 }
 
-function mapToVenue(result: any, index: number): Venue | null {
+// rating_vote_count is sometimes a decimal in thousands (1.8 = 1.8K) and sometimes the raw int.
+function normalizeReviewCount(n: number | undefined): number | undefined {
+  if (typeof n !== "number" || n <= 0) return undefined;
+  if (n < 50) return Math.round(n * 1000); // 1.8 → 1800
+  return Math.round(n);
+}
+
+function mapToVenue(result: RawPack, index: number): Venue | null {
   if (!result.title) return null;
 
-  const type = inferType(result);
-  const details: string[] = Array.isArray(result.details) ? result.details : [];
-  // address may appear as a detail entry or dedicated field
-  const address = result.address ?? details.find((d: string) => /\d/.test(d) && /st|ave|blvd|rd|dr|lane|street|avenue|city/i.test(d)) ?? "";
-  const reviewCount: number = result.rating_vote_count ?? result.reviews ?? 0;
-  const priceStr: string | undefined = result.price ?? details.find((d: string) => /^\$+$/.test(d.trim()));
-  const blurb = result.description ?? details.filter((d: string) => !/^\$+$/.test(d.trim()) && !/open|close|am|pm/i.test(d))[0] ?? result.title;
+  const { haystack, priceLine, quote } = parseDetails(result);
+  const lower = haystack.toLowerCase();
+  const type = inferType(lower);
+  const blurb = quote || haystack.replace(/"[^"]*"/g, "").trim().slice(0, 140) || result.title;
 
   return {
-    id: `scraper-${result.position ?? index}-${result.title.slice(0, 8).replace(/\s/g, "")}`,
+    id: `scraper-${result.position ?? index}-${result.title.slice(0, 12).replace(/\s/g, "")}`,
     name: result.title,
-    area: inferArea(address),
+    area: inferArea(haystack),
     type,
-    vibe: inferVibes(result, type),
-    cost: priceToCost(priceStr),
+    vibe: inferVibes(lower, type, priceLine),
+    cost: priceToCost(priceLine, type),
     duration: ({ culture: 120, outdoor: 120, night: 90, food: 75, shop: 90 } as Record<VenueType, number>)[type],
-    ...inferHours(result, type),
+    ...defaultHours(type),
     weatherProof: type !== "outdoor",
     blurb,
-    lat: result.gps_coordinates?.latitude ?? 14.5547,
-    lng: result.gps_coordinates?.longitude ?? 121.0244,
-    website: result.website ?? result.links?.website,
+    lat: 14.5547,
+    lng: 121.0244,
     rating: result.rating,
-    reviewCount: reviewCount > 0 ? reviewCount : undefined,
-    awards: detectAwards(result),
+    reviewCount: normalizeReviewCount(result.rating_vote_count),
+    awards: detectAwards(lower),
   };
 }

@@ -22,23 +22,28 @@ export default function Home() {
   const [result, setResult] = useState<PlanResult | null>(null);
   const [lastRequest, setLastRequest] = useState<Omit<PlanRequest, "exclude_ids"> | null>(null);
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleStart = () => setState("form");
 
   const runPlan = async (data: Omit<PlanRequest, "exclude_ids">, excluded: string[]) => {
     setState("loading");
+    setErrorMsg(null);
     try {
       const response = await fetch("/api/plan-weekend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, exclude_ids: excluded }),
       });
-      if (!response.ok) throw new Error("Failed to generate plan");
-      const planResult = (await response.json()) as PlanResult;
-      setResult(planResult);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || `Request failed (${response.status})`);
+      }
+      setResult(payload as PlanResult);
       setState("results");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
+      setErrorMsg(error?.message ?? "Something went wrong");
       setState("form");
     }
   };
@@ -187,6 +192,11 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
+              {errorMsg && (
+                <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {errorMsg}
+                </div>
+              )}
               <VibeForm onSubmit={handleSubmit} isLoading={false} />
             </motion.div>
           )}

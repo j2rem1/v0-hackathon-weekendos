@@ -1,4 +1,3 @@
-import { venues as seededVenues } from "./venues";
 import { PlanRequest, PlanResult, ItineraryStop, Venue, VenueType } from "./types";
 
 function parseTime(time: string): number {
@@ -113,7 +112,7 @@ function scoreVenue(venue: Venue, vibeText: string, budgetPerStop: number): numb
   return score;
 }
 
-export function planWeekend(request: PlanRequest, venuePool: Venue[] = seededVenues): PlanResult {
+export function planWeekend(request: PlanRequest, venuePool: Venue[]): PlanResult {
   const { vibe, budget_php, party_size, start_time, end_time, exclude_ids = [] } = request;
 
   const budgetPerStop = budget_php / 4;
