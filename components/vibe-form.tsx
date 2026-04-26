@@ -159,14 +159,22 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
       </div>
 
       {/* Submit Button */}
-      <Button
+      <button
         type="submit"
         disabled={!vibe.trim() || isLoading}
-        className="w-full h-12 text-base font-semibold gap-2 mt-8"
+        className="w-full h-14 rounded-2xl text-base font-bold gap-2 mt-8 inline-flex items-center justify-center text-white transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+        style={
+          !vibe.trim() || isLoading
+            ? { background: 'oklch(0.60 0.22 28 / 0.4)' }
+            : {
+                background: 'linear-gradient(135deg, oklch(0.78 0.14 52), oklch(0.60 0.22 28))',
+                boxShadow: '0 6px 24px oklch(0.60 0.22 28 / 0.30)',
+              }
+        }
       >
         <Sparkles className="w-5 h-5" />
         {isLoading ? "Planning..." : "Plan my weekend"}
-      </Button>
+      </button>
     </motion.form>
   );
 }

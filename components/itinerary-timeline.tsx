@@ -38,17 +38,17 @@ function getTypeIcon(type: VenueType): string {
 function getTypeColor(type: VenueType): string {
   switch (type) {
     case "food":
-      return "bg-amber-500/10 border-amber-500/30 text-amber-600";
+      return "bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700/50 dark:text-amber-400";
     case "culture":
-      return "bg-rose-500/10 border-rose-500/30 text-rose-600";
+      return "bg-rose-100 border-rose-300 text-rose-700 dark:bg-rose-900/30 dark:border-rose-700/50 dark:text-rose-400";
     case "outdoor":
-      return "bg-emerald-500/10 border-emerald-500/30 text-emerald-600";
+      return "bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700/50 dark:text-emerald-400";
     case "night":
-      return "bg-indigo-500/10 border-indigo-500/30 text-indigo-600";
+      return "bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700/50 dark:text-violet-400";
     case "shop":
-      return "bg-cyan-500/10 border-cyan-500/30 text-cyan-600";
+      return "bg-sky-100 border-sky-300 text-sky-700 dark:bg-sky-900/30 dark:border-sky-700/50 dark:text-sky-400";
     default:
-      return "bg-gray-500/10 border-gray-500/30 text-gray-600";
+      return "bg-secondary border-border text-foreground/60";
   }
 }
 
@@ -73,14 +73,14 @@ function TimelineStop({
       {/* Timeline connector */}
       <div className="flex flex-col items-center">
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 ${getTypeColor(
+          className={`w-12 h-12 rounded-full flex items-center justify-center text-xl border-2 shadow-sm ${getTypeColor(
             stop.venue.type
           )}`}
         >
           {getTypeIcon(stop.venue.type)}
         </div>
         {!isLast && (
-          <div className="w-0.5 flex-1 min-h-[60px] bg-border mt-2" />
+          <div className="w-px flex-1 min-h-[60px] bg-border/60 mt-2 border-l border-dashed border-border" />
         )}
       </div>
 
@@ -189,9 +189,9 @@ export function ItineraryTimeline({ result, onReset }: ItineraryTimelineProps) {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/20"
+        className="mb-6 p-5 rounded-2xl bg-primary/10 border border-primary/25"
       >
-        <h2 className="font-semibold text-lg text-foreground mb-2">
+        <h2 className="font-black text-xl text-foreground mb-3 tracking-tight">
           Your Weekend Plan
         </h2>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">

@@ -54,10 +54,10 @@ export default function Home() {
 
   return (
     <main className="relative min-h-dvh bg-background overflow-hidden">
-      {/* Subtle radial glow — hero only */}
+      {/* Warm peach glow — hero anchor */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 bg-primary/5 blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] scale-x-125 rounded-full bg-primary/18 blur-[100px]"
       />
 
       <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -74,7 +74,7 @@ export default function Home() {
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
               <Calendar className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold text-foreground">WeekendOS</span>
+            <span className="text-xl font-black tracking-tight text-foreground">WeekendOS</span>
           </button>
 
           <div className="flex items-center gap-3">
@@ -99,40 +99,40 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, y: -20 }}
-              className="text-center pt-20 pb-24"
+              className="text-center pt-24 pb-28"
             >
-              {/* Badge — tight lead-in to headline */}
+              {/* Badge */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-5 tracking-wide"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold mb-8 tracking-wide uppercase"
               >
                 <Sparkles className="w-3 h-3" />
                 Metro Manila weekend planner
               </motion.div>
 
-              {/* Headline — medium gap to subtitle */}
+              {/* Headline */}
               <motion.h1
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-4xl md:text-5xl font-bold text-foreground mb-6 text-balance leading-tight"
+                transition={{ delay: 0.1, duration: 0.5 }}
+                className="text-5xl sm:text-6xl md:text-7xl font-black text-foreground mb-7 text-balance leading-[1.05] tracking-tighter"
               >
-                Your AI Chief-of-Staff
+                Plan your Saturday
                 <br />
-                <span className="text-primary">for Free Time</span>
+                <span className="text-primary">in 5 seconds.</span>
               </motion.h1>
 
-              {/* Subtitle — generous gap before CTA (the key action) */}
+              {/* Subtitle */}
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-lg text-muted-foreground mb-12 max-w-md mx-auto text-pretty"
+                className="text-lg md:text-xl text-muted-foreground mb-12 max-w-sm mx-auto text-pretty leading-relaxed"
               >
-                Tell us your vibe, budget, and crew. Get a timed, weather-aware
-                itinerary in seconds.
+                Tell us your vibe, budget, and crew. Get a timed, weather-proof
+                Metro Manila itinerary instantly.
               </motion.p>
 
               <motion.div
@@ -142,25 +142,26 @@ export default function Home() {
               >
                 <button
                   onClick={handleStart}
-                  className="group inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-full text-base font-semibold hover:scale-[1.03] active:scale-[0.97] transition-transform duration-150"
+                  className="group inline-flex items-center gap-2.5 px-10 py-5 rounded-2xl text-base font-bold text-white hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-lg"
+                  style={{ background: 'linear-gradient(135deg, oklch(0.78 0.14 52), oklch(0.60 0.22 28))', boxShadow: '0 8px 32px oklch(0.60 0.22 28 / 0.35)' }}
                 >
                   <Sparkles className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
                   Plan my weekend
                 </button>
               </motion.div>
 
-              {/* Feature strip */}
+              {/* Feature pills */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="mt-16 flex items-center justify-center gap-2 text-sm text-muted-foreground flex-wrap"
+                className="mt-14 flex items-center justify-center gap-3 flex-wrap"
               >
-                {FEATURES.map((f, i) => (
-                  <span key={f.label} className="inline-flex items-center gap-1.5">
-                    {i > 0 && (
-                      <span className="mr-1 text-border/60 select-none" aria-hidden>·</span>
-                    )}
+                {FEATURES.map((f) => (
+                  <span
+                    key={f.label}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-border bg-card text-sm font-medium text-foreground/70"
+                  >
                     <span aria-hidden>{f.icon}</span>
                     {f.label}
                   </span>
