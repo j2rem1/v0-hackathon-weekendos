@@ -1,15 +1,28 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Bricolage_Grotesque, Manrope, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+const body = Manrope({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
+});
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: 'WeekendOS - Plan Your Saturday in 5 Seconds',
-  description: 'Your AI chief-of-staff for free time. Get a timed, budget-aware, weather-proof Metro Manila itinerary in seconds.',
+  title: 'WeekendOS, Saturday in Manila, sorted.',
+  description: 'Type a vibe, get a timed Metro Manila itinerary. Real venues, honest budget, weather-aware. From Poblacion to QC.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -36,8 +49,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className="bg-background">
-      <body className="font-sans antialiased">
+    <html lang="en" suppressHydrationWarning className={`bg-background ${display.variable} ${body.variable} ${mono.variable}`}>
+      <body className="font-body antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>

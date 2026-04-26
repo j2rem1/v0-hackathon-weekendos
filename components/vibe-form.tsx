@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Users, Wallet, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, Users, Wallet, Clock } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 
@@ -19,12 +18,12 @@ interface VibeFormProps {
 }
 
 const QUICK_VIBES = [
-  "rainy day, want comfort food",
-  "date night, something romantic",
-  "with friends, fun and weird",
-  "solo chill, coffee and art",
-  "outdoor adventure, nature escape",
-  "foodie crawl, best eats",
+  "rainy poblacion crawl, ₱2K",
+  "barkada brunch in Maginhawa",
+  "solo coffee + thrift, Cubao",
+  "first date, BGC, no fuss",
+  "antipolo escape sunday",
+  "post-payday treat in Rockwell",
 ];
 
 export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
@@ -37,143 +36,128 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!vibe.trim()) return;
-    onSubmit({
-      vibe,
-      budget_php: budget,
-      party_size: partySize,
-      start_time: startTime,
-      end_time: endTime,
-    });
+    onSubmit({ vibe, budget_php: budget, party_size: partySize, start_time: startTime, end_time: endTime });
   };
 
   return (
     <motion.form
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
+      transition={{ duration: 0.45 }}
       onSubmit={handleSubmit}
-      className="w-full max-w-lg mx-auto"
+      className="w-full"
     >
-      {/* Vibe Input — primary field, most breathing room after */}
-      <div className="mb-10 space-y-3">
-        <label className="text-sm font-medium text-foreground/80">
-          What&apos;s your vibe?
-        </label>
+      <div className="mb-2">
+        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-muted-foreground mb-2">Step 01</p>
+        <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight leading-[1.05]">
+          What's the move?
+        </h2>
+      </div>
+
+      {/* Vibe input */}
+      <div className="mt-7 mb-9">
         <Textarea
           value={vibe}
           onChange={(e) => setVibe(e.target.value)}
-          placeholder="rainy Saturday, ₱3000 budget, with my partner, want food and something weird..."
-          className="min-h-[100px] text-base resize-none bg-card border-border/50 focus:border-primary/50 transition-colors"
+          placeholder="rainy Saturday, ₱3K, with my partner, want comfort food and something weird after..."
+          className="min-h-[120px] text-base resize-none bg-card border-2 border-foreground/10 focus:border-primary/60 transition-colors rounded-xl px-4 py-3 leading-relaxed"
         />
-
-        {/* Quick Vibe Pills */}
-        <div className="flex flex-wrap gap-2">
-          {QUICK_VIBES.map((quickVibe) => (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {QUICK_VIBES.map((q) => (
             <button
-              key={quickVibe}
+              key={q}
               type="button"
-              onClick={() => setVibe(quickVibe)}
-              className="px-3 py-1.5 text-xs rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              onClick={() => setVibe(q)}
+              className="rounded-full border border-foreground/15 bg-card px-3 py-1.5 text-xs font-medium text-foreground/75 hover:border-primary/60 hover:text-primary transition-colors"
             >
-              {quickVibe}
+              {q}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Budget Slider */}
-      <div className="mb-7 space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
-            <Wallet className="w-4 h-4" />
-            Budget per person
+      {/* Budget */}
+      <div className="mb-8">
+        <div className="flex items-end justify-between mb-3">
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground/85">
+            <Wallet className="w-4 h-4" /> Budget per person
           </label>
-          <span className="text-sm font-semibold text-primary">
+          <span className="font-mono tabular-nums text-2xl font-extrabold text-foreground">
             ₱{budget.toLocaleString()}
           </span>
         </div>
         <Slider
           value={[budget]}
-          onValueChange={(value) => setBudget(value[0])}
+          onValueChange={(v) => setBudget(v[0])}
           min={500}
           max={10000}
           step={500}
-          className="w-full"
         />
-        <div className="flex justify-between text-xs text-muted-foreground">
+        <div className="mt-2 flex justify-between text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
           <span>₱500</span>
-          <span>₱10,000</span>
+          <span>₱10K</span>
         </div>
       </div>
 
-      {/* Party Size */}
-      <div className="mb-7 space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Party size
+      {/* Party size */}
+      <div className="mb-8">
+        <div className="flex items-end justify-between mb-3">
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground/85">
+            <Users className="w-4 h-4" /> Party size
           </label>
-          <span className="text-sm font-semibold text-primary">
-            {partySize} {partySize === 1 ? "person" : "people"}
+          <span className="font-mono tabular-nums text-sm text-muted-foreground">
+            {partySize === 1 ? "going solo" : `${partySize} people`}
           </span>
         </div>
-        <div className="flex gap-2">
-          {[1, 2, 3, 4, 5, 6].map((size) => (
+        <div className="grid grid-cols-6 gap-1.5">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
             <button
-              key={size}
+              key={n}
               type="button"
-              onClick={() => setPartySize(size)}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                partySize === size
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              onClick={() => setPartySize(n)}
+              className={`py-2.5 rounded-lg font-display text-base font-bold transition-all border-2 ${
+                partySize === n
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-card text-foreground/70 border-foreground/10 hover:border-foreground/30"
               }`}
             >
-              {size}
+              {n}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Time Range — tertiary, tightest spacing */}
-      <div className="mb-5 space-y-2">
-        <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          Time window
+      {/* Time window */}
+      <div className="mb-10">
+        <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground/85 mb-3">
+          <Clock className="w-4 h-4" /> Time window
         </label>
         <div className="flex items-center gap-3">
           <input
             type="time"
             value={startTime}
             onChange={(e) => setStartTime(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm"
+            className="flex-1 px-4 py-3 rounded-lg bg-card border-2 border-foreground/10 text-base font-mono tabular-nums focus:border-primary/60 focus:outline-none transition-colors"
           />
           <span className="text-muted-foreground text-sm">to</span>
           <input
             type="time"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm"
+            className="flex-1 px-4 py-3 rounded-lg bg-card border-2 border-foreground/10 text-base font-mono tabular-nums focus:border-primary/60 focus:outline-none transition-colors"
           />
         </div>
       </div>
 
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={!vibe.trim() || isLoading}
-        className="w-full h-14 rounded-2xl text-base font-bold gap-2 mt-8 inline-flex items-center justify-center text-white transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-        style={
-          !vibe.trim() || isLoading
-            ? { background: 'oklch(0.60 0.22 28 / 0.4)' }
-            : {
-                background: 'linear-gradient(135deg, oklch(0.78 0.14 52), oklch(0.60 0.22 28))',
-                boxShadow: '0 6px 24px oklch(0.60 0.22 28 / 0.30)',
-              }
-        }
+        className="group w-full inline-flex items-center justify-between rounded-full bg-foreground text-background pl-6 pr-2 py-2 text-base font-semibold shadow-[0_10px_30px_-8px_oklch(0.18_0.04_270/0.45)] hover:translate-y-[-1px] active:translate-y-[1px] transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
-        <Sparkles className="w-5 h-5" />
-        {isLoading ? "Planning..." : "Plan my weekend"}
+        <span>{isLoading ? "Planning..." : "Build my Saturday"}</span>
+        <span className="inline-flex items-center justify-center size-11 rounded-full bg-primary text-primary-foreground group-hover:rotate-[-12deg] transition-transform">
+          <ArrowRight className="w-5 h-5" />
+        </span>
       </button>
     </motion.form>
   );
