@@ -68,8 +68,13 @@ function buildQuery(vibe: string): string {
   return tags.join(" ");
 }
 
+function detailsRaw(result: any): string {
+  const details: string[] = Array.isArray(result.details) ? result.details : [];
+  return [result.type ?? "", result.description ?? "", ...details].join(" ").toLowerCase();
+}
+
 function inferType(result: any): VenueType {
-  const raw = [result.type ?? "", ...(result.types ?? [])].join(" ").toLowerCase();
+  const raw = detailsRaw(result);
   if (/restaurant|food|dining|cuisine|cafe|coffee|bakery|eatery/.test(raw)) return "food";
   if (/museum|gallery|art|exhibit|cultural|heritage/.test(raw)) return "culture";
   if (/park|nature|garden|eco|outdoor|trail/.test(raw)) return "outdoor";
@@ -79,15 +84,16 @@ function inferType(result: any): VenueType {
 }
 
 function inferVibes(result: any, type: VenueType): Vibe[] {
-  const raw = [result.type ?? "", result.description ?? ""].join(" ").toLowerCase();
+  const raw = detailsRaw(result);
   const vibes: Vibe[] = [];
 
   if (type === "food") vibes.push("foodie");
   if (/coffee|cafe/.test(raw)) vibes.push("coffee");
   if (/romantic|intimate|couples/.test(raw) || type === "night") vibes.push("date");
   if (/art|gallery/.test(raw)) vibes.push("art");
-  if (result.price === "$$$" || result.price === "$$$$") vibes.push("upscale");
-  if (result.price === "$") vibes.push("cheap");
+  const price = result.price ?? (raw.match(/(\$+)/)?.[1] ?? "");
+  if (price === "$$$" || price === "$$$$") vibes.push("upscale");
+  if (price === "$") vibes.push("cheap");
   if (/brunch|breakfast/.test(raw)) vibes.push("brunch");
   if (/casual/.test(raw)) vibes.push("casual");
   if (/family/.test(raw)) vibes.push("family");
@@ -105,12 +111,7 @@ function inferVibes(result: any, type: VenueType): Vibe[] {
 }
 
 function detectAwards(result: any): string[] {
-  const haystack = [
-    result.description ?? "",
-    result.type ?? "",
-    ...(result.types ?? []),
-    result.extensions?.service_options ?? "",
-  ].join(" ").toLowerCase();
+  const haystack = detailsRaw(result);
 
   return AWARD_KEYWORDS.filter((kw) => haystack.includes(kw)).map((kw) => {
     const labels: Record<string, string> = {
@@ -139,7 +140,8 @@ function inferArea(address: string): string {
 }
 
 function inferHours(result: any, type: VenueType): { opens: string; closes: string } {
-  const hoursStr: string = result.hours ?? "";
+  const details: string[] = Array.isArray(result.details) ? result.details : [];
+  const hoursStr: string = result.hours ?? details.find((d: string) => /open|close|am|pm/i.test(d)) ?? "";
   const closeMatch = hoursStr.match(/closes?\s+(\d+)(?::(\d+))?\s*(am|pm)/i);
   if (closeMatch) {
     let hour = parseInt(closeMatch[1]);
@@ -167,20 +169,24 @@ function mapToVenue(result: any, index: number): Venue | null {
   if (!result.title) return null;
 
   const type = inferType(result);
-  const address = result.address ?? "";
-  const reviewCount: number = result.reviews ?? result.review_count ?? 0;
+  const details: string[] = Array.isArray(result.details) ? result.details : [];
+  // address may appear as a detail entry or dedicated field
+  const address = result.address ?? details.find((d: string) => /\d/.test(d) && /st|ave|blvd|rd|dr|lane|street|avenue|city/i.test(d)) ?? "";
+  const reviewCount: number = result.rating_vote_count ?? result.reviews ?? 0;
+  const priceStr: string | undefined = result.price ?? details.find((d: string) => /^\$+$/.test(d.trim()));
+  const blurb = result.description ?? details.filter((d: string) => !/^\$+$/.test(d.trim()) && !/open|close|am|pm/i.test(d))[0] ?? result.title;
 
   return {
-    id: `scraper-${result.place_id ?? result.data_id ?? index}`,
+    id: `scraper-${result.position ?? index}-${result.title.slice(0, 8).replace(/\s/g, "")}`,
     name: result.title,
     area: inferArea(address),
     type,
     vibe: inferVibes(result, type),
-    cost: priceToCost(result.price),
+    cost: priceToCost(priceStr),
     duration: ({ culture: 120, outdoor: 120, night: 90, food: 75, shop: 90 } as Record<VenueType, number>)[type],
     ...inferHours(result, type),
     weatherProof: type !== "outdoor",
-    blurb: result.description ?? result.type ?? result.title,
+    blurb,
     lat: result.gps_coordinates?.latitude ?? 14.5547,
     lng: result.gps_coordinates?.longitude ?? 121.0244,
     website: result.website ?? result.links?.website,
