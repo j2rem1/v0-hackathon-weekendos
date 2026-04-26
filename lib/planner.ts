@@ -1,4 +1,4 @@
-import { venues } from "./venues";
+import { venues as seededVenues } from "./venues";
 import { PlanRequest, PlanResult, ItineraryStop, Venue, VenueType } from "./types";
 
 function parseTime(time: string): number {
@@ -99,29 +99,38 @@ function scoreVenue(venue: Venue, vibeText: string, budgetPerStop: number): numb
     score += 1;
   }
 
-  // Random factor for variety
-  score += Math.random() * 0.5;
+  // Quality signals from live data
+  if (venue.rating) {
+    if (venue.rating >= 4.5) score += 2;
+    else if (venue.rating >= 4.0) score += 1;
+  }
+  if (venue.reviewCount && venue.reviewCount >= 500) score += 1; // popular/trending
+  if (venue.awards && venue.awards.length > 0) score += 3;
+
+  // Random factor for variety — large enough to actually shuffle similarly-scored venues
+  score += Math.random() * 2;
 
   return score;
 }
 
-export function planWeekend(request: PlanRequest): PlanResult {
-  const { vibe, budget_php, party_size, start_time, end_time } = request;
-  
+export function planWeekend(request: PlanRequest, venuePool: Venue[] = seededVenues): PlanResult {
+  const { vibe, budget_php, party_size, start_time, end_time, exclude_ids = [] } = request;
+
   const budgetPerStop = budget_php / 4;
   const totalBudgetPHP = budget_php * party_size;
-  
+
   const startMinutes = parseTime(start_time);
   let endMinutes = parseTime(end_time);
   if (endMinutes < startMinutes) {
     endMinutes += 24 * 60;
   }
-  
+
   const lowerVibe = vibe.toLowerCase();
   const requireWeatherProof = /rain|wet|stormy|typhoon/.test(lowerVibe);
 
   // Score and filter venues
-  const scoredVenues = venues
+  const scoredVenues = venuePool
+    .filter((v) => !exclude_ids.includes(v.id))
     .filter((v) => !requireWeatherProof || v.weatherProof)
     .map((venue) => ({
       venue,

@@ -38,6 +38,11 @@ export interface Venue {
   blurb: string;
   lat: number;
   lng: number;
+  // enriched from SerpAPI
+  website?: string;
+  rating?: number;
+  reviewCount?: number;
+  awards?: string[];
 }
 
 export interface PlanRequest {
@@ -46,6 +51,7 @@ export interface PlanRequest {
   party_size: number;
   start_time: string; // HH:MM
   end_time: string; // HH:MM
+  exclude_ids?: string[]; // venues to skip (used by swap flow)
 }
 
 export interface ItineraryStop {

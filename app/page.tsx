@@ -7,7 +7,7 @@ import { VibeForm } from "@/components/vibe-form";
 import { ItineraryTimeline } from "@/components/itinerary-timeline";
 import { LoadingState } from "@/components/loading-state";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { PlanResult } from "@/lib/types";
+import { PlanResult, PlanRequest } from "@/lib/types";
 
 type AppState = "hero" | "form" | "loading" | "results";
 
@@ -20,22 +20,18 @@ const FEATURES = [
 export default function Home() {
   const [state, setState] = useState<AppState>("hero");
   const [result, setResult] = useState<PlanResult | null>(null);
+  const [lastRequest, setLastRequest] = useState<Omit<PlanRequest, "exclude_ids"> | null>(null);
+  const [excludedIds, setExcludedIds] = useState<string[]>([]);
 
   const handleStart = () => setState("form");
 
-  const handleSubmit = async (data: {
-    vibe: string;
-    budget_php: number;
-    party_size: number;
-    start_time: string;
-    end_time: string;
-  }) => {
+  const runPlan = async (data: Omit<PlanRequest, "exclude_ids">, excluded: string[]) => {
     setState("loading");
     try {
       const response = await fetch("/api/plan-weekend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, exclude_ids: excluded }),
       });
       if (!response.ok) throw new Error("Failed to generate plan");
       const planResult = (await response.json()) as PlanResult;
@@ -47,8 +43,22 @@ export default function Home() {
     }
   };
 
+  const handleSubmit = async (data: Omit<PlanRequest, "exclude_ids">) => {
+    setLastRequest(data);
+    setExcludedIds([]);
+    await runPlan(data, []);
+  };
+
+  const handleSwap = async (venueId: string) => {
+    if (!lastRequest) return;
+    const newExcluded = [...excludedIds, venueId];
+    setExcludedIds(newExcluded);
+    await runPlan(lastRequest, newExcluded);
+  };
+
   const handleReset = () => {
     setResult(null);
+    setExcludedIds([]);
     setState("form");
   };
 
@@ -199,7 +209,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <ItineraryTimeline result={result} onReset={handleReset} />
+              <ItineraryTimeline result={result} onReset={handleReset} onSwap={handleSwap} />
             </motion.div>
           )}
         </AnimatePresence>

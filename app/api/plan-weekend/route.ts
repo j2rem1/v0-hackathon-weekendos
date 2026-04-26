@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { planWeekend } from "@/lib/planner";
+import { searchVenuesByVibe } from "@/lib/search";
 import { PlanRequest } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -35,12 +36,12 @@ export async function POST(request: Request) {
       party_size: body.party_size,
       start_time: body.start_time || "10:00",
       end_time: body.end_time || "22:00",
+      exclude_ids: Array.isArray(body.exclude_ids) ? body.exclude_ids : [],
     };
 
-    const result = planWeekend(planRequest);
-
-    // Simulate a brief delay for UX (feels more "AI-like")
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    // Try live SerpAPI venues; fall back to seeded data if key missing or request fails
+    const liveVenues = await searchVenuesByVibe(planRequest.vibe);
+    const result = planWeekend(planRequest, liveVenues.length >= 4 ? liveVenues : undefined);
 
     return NextResponse.json(result);
   } catch (error) {
