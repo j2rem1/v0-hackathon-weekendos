@@ -10,7 +10,10 @@ const AWARD_KEYWORDS = [
 
 export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
   const key = process.env.SERPAPI_KEY;
-  if (!key) return [];
+  if (!key) {
+    console.log("[search] SERPAPI_KEY not set — using seeded venues");
+    return [];
+  }
 
   const url = new URL(SERPAPI_BASE);
   url.searchParams.set("engine", "google_maps");
@@ -20,19 +23,26 @@ export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
   url.searchParams.set("hl", "en");
   url.searchParams.set("gl", "ph");
 
-  const res = await fetch(url.toString(), {
-    next: { revalidate: 3600 }, // cache 1hr — same vibe won't burn credits
-  });
+  try {
+    const res = await fetch(url.toString(), { cache: "no-store" });
 
-  if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("[search] SerpAPI error:", res.status, await res.text());
+      return [];
+    }
 
-  const data = await res.json();
-  const results: any[] = data.local_results ?? [];
+    const data = await res.json();
+    const results: any[] = data.local_results ?? [];
+    console.log(`[search] SerpAPI returned ${results.length} results`);
 
-  return results
-    .slice(0, 16)
-    .map((r, i) => mapToVenue(r, i))
-    .filter((v): v is Venue => v !== null);
+    return results
+      .slice(0, 16)
+      .map((r, i) => mapToVenue(r, i))
+      .filter((v): v is Venue => v !== null);
+  } catch (err) {
+    console.error("[search] SerpAPI fetch failed:", err);
+    return [];
+  }
 }
 
 function buildQuery(vibe: string): string {
