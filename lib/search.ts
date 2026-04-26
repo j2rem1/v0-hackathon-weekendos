@@ -1,6 +1,6 @@
 import { Venue, VenueType, Vibe } from "./types";
 
-const SERPAPI_BASE = "https://serpapi.com/search.json";
+const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/google/maps";
 
 const AWARD_KEYWORDS = [
   "michelin", "asia's 50 best", "world's 50 best", "50 best",
@@ -9,38 +9,35 @@ const AWARD_KEYWORDS = [
 ];
 
 export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
-  const key = process.env.SERPAPI_KEY;
+  const key = process.env.SCRAPERAPI_KEY;
   if (!key) {
-    console.log("[search] SERPAPI_KEY not set — using seeded venues");
+    console.log("[search] SCRAPERAPI_KEY not set — using seeded venues");
     return [];
   }
 
-  const url = new URL(SERPAPI_BASE);
-  url.searchParams.set("engine", "google_maps");
-  url.searchParams.set("q", buildQuery(vibe));
-  url.searchParams.set("type", "search");
+  const url = new URL(SCRAPERAPI_BASE);
   url.searchParams.set("api_key", key);
-  url.searchParams.set("hl", "en");
-  url.searchParams.set("gl", "ph");
+  url.searchParams.set("query", buildQuery(vibe));
+  url.searchParams.set("type", "search");
 
   try {
     const res = await fetch(url.toString(), { cache: "no-store" });
 
     if (!res.ok) {
-      console.error("[search] SerpAPI error:", res.status, await res.text());
+      console.error("[search] ScraperAPI error:", res.status, await res.text());
       return [];
     }
 
     const data = await res.json();
-    const results: any[] = data.local_results ?? [];
-    console.log(`[search] SerpAPI returned ${results.length} results`);
+    const results: any[] = data.local_results ?? data.results ?? [];
+    console.log(`[search] ScraperAPI returned ${results.length} results`);
 
     return results
       .slice(0, 16)
       .map((r, i) => mapToVenue(r, i))
       .filter((v): v is Venue => v !== null);
   } catch (err) {
-    console.error("[search] SerpAPI fetch failed:", err);
+    console.error("[search] ScraperAPI fetch failed:", err);
     return [];
   }
 }
@@ -168,10 +165,10 @@ function mapToVenue(result: any, index: number): Venue | null {
 
   const type = inferType(result);
   const address = result.address ?? "";
-  const reviewCount: number = result.reviews ?? 0;
+  const reviewCount: number = result.reviews ?? result.review_count ?? 0;
 
   return {
-    id: `serp-${result.place_id ?? index}`,
+    id: `scraper-${result.place_id ?? result.data_id ?? index}`,
     name: result.title,
     area: inferArea(address),
     type,
@@ -183,7 +180,6 @@ function mapToVenue(result: any, index: number): Venue | null {
     blurb: result.description ?? result.type ?? result.title,
     lat: result.gps_coordinates?.latitude ?? 14.5547,
     lng: result.gps_coordinates?.longitude ?? 121.0244,
-    // enriched fields
     website: result.website ?? result.links?.website,
     rating: result.rating,
     reviewCount: reviewCount > 0 ? reviewCount : undefined,
