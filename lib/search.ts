@@ -1,6 +1,6 @@
 import { Venue, VenueType, Vibe } from "./types";
 
-const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/google/maps";
+const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/google/search";
 
 const AWARD_KEYWORDS = [
   "michelin", "asia's 50 best", "world's 50 best", "50 best",
@@ -18,7 +18,8 @@ export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
   const url = new URL(SCRAPERAPI_BASE);
   url.searchParams.set("api_key", key);
   url.searchParams.set("query", buildQuery(vibe));
-  url.searchParams.set("type", "search");
+  url.searchParams.set("country_code", "ph");
+  url.searchParams.set("hl", "en");
 
   try {
     const res = await fetch(url.toString(), { cache: "no-store" });
@@ -29,8 +30,8 @@ export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
     }
 
     const data = await res.json();
-    const results: any[] = data.local_results ?? data.results ?? [];
-    console.log(`[search] ScraperAPI returned ${results.length} results`);
+    const results: any[] = data.local_results ?? data.local_pack ?? [];
+    console.log(`[search] ScraperAPI returned ${results.length} local results`);
 
     return results
       .slice(0, 16)
