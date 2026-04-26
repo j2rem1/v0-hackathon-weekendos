@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { planWeekend } from "@/lib/planner";
 import { searchVenuesByVibe } from "@/lib/search";
+import { venues as seededVenues } from "@/lib/venues";
 import { PlanRequest } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -39,9 +40,15 @@ export async function POST(request: Request) {
       exclude_ids: Array.isArray(body.exclude_ids) ? body.exclude_ids : [],
     };
 
-    // Try live SerpAPI venues; fall back to seeded data if key missing or request fails
+    // Merge live + seeded so planner always has a full pool
+    // Live venues rank higher naturally via rating/award score boosts
     const liveVenues = await searchVenuesByVibe(planRequest.vibe);
-    const result = planWeekend(planRequest, liveVenues.length >= 4 ? liveVenues : undefined);
+    const liveNames = new Set(liveVenues.map((v) => v.name.toLowerCase()));
+    const venuePool = [
+      ...liveVenues,
+      ...seededVenues.filter((v) => !liveNames.has(v.name.toLowerCase())),
+    ];
+    const result = planWeekend(planRequest, venuePool);
 
     return NextResponse.json(result);
   } catch (error) {

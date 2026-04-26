@@ -8,6 +8,27 @@ const AWARD_KEYWORDS = [
   "zagat", "james beard", "bib gourmand",
 ];
 
+async function fetchQuery(key: string, query: string): Promise<any[]> {
+  const url = new URL(SCRAPERAPI_BASE);
+  url.searchParams.set("api_key", key);
+  url.searchParams.set("query", query);
+  url.searchParams.set("country_code", "ph");
+  url.searchParams.set("hl", "en");
+
+  try {
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) {
+      console.error("[search] ScraperAPI error:", res.status);
+      return [];
+    }
+    const data = await res.json();
+    const packs: any[] = data.local_packs ?? [];
+    return packs.flatMap((p: any) => p.locals ?? p.results ?? [p]).filter((r: any) => r.title);
+  } catch {
+    return [];
+  }
+}
+
 export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
   const key = process.env.SCRAPERAPI_KEY;
   if (!key) {
@@ -15,57 +36,54 @@ export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
     return [];
   }
 
-  const url = new URL(SCRAPERAPI_BASE);
-  url.searchParams.set("api_key", key);
-  url.searchParams.set("query", buildQuery(vibe));
-  url.searchParams.set("country_code", "ph");
-  url.searchParams.set("hl", "en");
-
-  try {
-    const res = await fetch(url.toString(), { cache: "no-store" });
-
-    if (!res.ok) {
-      console.error("[search] ScraperAPI error:", res.status, await res.text());
-      return [];
+  const queries = buildQueries(vibe);
+  const batches = await Promise.all(queries.map((q) => fetchQuery(key, q)));
+  const seen = new Set<string>();
+  const results: any[] = [];
+  for (const batch of batches) {
+    for (const r of batch) {
+      const key = r.title.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); results.push(r); }
     }
-
-    const data = await res.json();
-    // local_packs is an array of pack sections; flatten all items across sections
-    const packs: any[] = data.local_packs ?? [];
-    const results: any[] = packs.flatMap((p: any) => p.locals ?? p.results ?? [p]).filter((r: any) => r.title);
-    console.log(`[search] ScraperAPI returned ${results.length} local results`);
-
-    return results
-      .slice(0, 16)
-      .map((r, i) => mapToVenue(r, i))
-      .filter((v): v is Venue => v !== null);
-  } catch (err) {
-    console.error("[search] ScraperAPI fetch failed:", err);
-    return [];
   }
+
+  console.log(`[search] ScraperAPI returned ${results.length} deduplicated results`);
+  return results
+    .slice(0, 16)
+    .map((r, i) => mapToVenue(r, i))
+    .filter((v): v is Venue => v !== null);
 }
 
-function buildQuery(vibe: string): string {
+function buildQueries(vibe: string): string[] {
   const lower = vibe.toLowerCase();
-  const tags: string[] = [];
+  const modifiers: string[] = [];
 
-  if (/food|eat|hungry|foodie/.test(lower)) tags.push("restaurants");
-  if (/bar|night|drink|party|cocktail/.test(lower)) tags.push("bars");
-  if (/art|museum|culture/.test(lower)) tags.push("museums");
-  if (/coffee|cafe|chill/.test(lower)) tags.push("cafes");
-  if (/nature|outdoor|park|escape/.test(lower)) tags.push("parks");
-  if (/shop|vintage|thrift/.test(lower)) tags.push("shops");
-  if (tags.length === 0) tags.push("things to do");
+  if (/date|romantic|partner/.test(lower)) modifiers.push("romantic");
+  if (/weird|unique|different/.test(lower)) modifiers.push("unique hidden gems");
+  if (/group|friends|barkada/.test(lower)) modifiers.push("group-friendly");
+  if (/cheap|budget/.test(lower)) modifiers.push("affordable");
+  if (/upscale|fancy/.test(lower)) modifiers.push("upscale fine dining");
+  if (/trending|popular|viral/.test(lower)) modifiers.push("trending popular");
 
-  if (/date|romantic|partner/.test(lower)) tags.push("romantic");
-  if (/weird|unique|different/.test(lower)) tags.push("unique hidden gems");
-  if (/group|friends|barkada/.test(lower)) tags.push("group-friendly");
-  if (/cheap|budget/.test(lower)) tags.push("affordable");
-  if (/upscale|fancy/.test(lower)) tags.push("upscale fine dining");
-  if (/trending|popular|viral/.test(lower)) tags.push("trending popular");
+  const suffix = [...modifiers, "Metro Manila Philippines"].join(" ");
 
-  tags.push("Metro Manila Philippines");
-  return tags.join(" ");
+  // First query: dining/nightlife. Second: experiences/culture/nature.
+  const q1Types: string[] = [];
+  if (/food|eat|hungry|foodie/.test(lower)) q1Types.push("restaurants");
+  if (/bar|night|drink|party|cocktail/.test(lower)) q1Types.push("bars");
+  if (/coffee|cafe|chill/.test(lower)) q1Types.push("cafes");
+  if (q1Types.length === 0) q1Types.push("restaurants cafes");
+
+  const q2Types: string[] = [];
+  if (/art|museum|culture/.test(lower)) q2Types.push("museums galleries");
+  if (/nature|outdoor|park|escape/.test(lower)) q2Types.push("parks nature spots");
+  if (/shop|vintage|thrift/.test(lower)) q2Types.push("shops boutiques");
+  if (q2Types.length === 0) q2Types.push("things to do attractions");
+
+  return [
+    `${q1Types.join(" ")} ${suffix}`,
+    `${q2Types.join(" ")} ${suffix}`,
+  ];
 }
 
 function detailsRaw(result: any): string {
