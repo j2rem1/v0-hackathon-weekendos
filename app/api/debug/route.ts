@@ -13,8 +13,9 @@ export async function GET() {
   try {
     const res = await fetch(url.toString(), { cache: "no-store" });
     const data = await res.json();
-    const results = data.local_results ?? data.local_pack ?? [];
-    const sampleKeys = results[0] ? Object.keys(results[0]) : [];
+    const packs: any[] = data.local_packs ?? [];
+    const results = packs.flatMap((p: any) => p.locals ?? p.results ?? [p]).filter((r: any) => r.title);
+    const sampleKeys = results[0] ? Object.keys(results[0]) : packs[0] ? Object.keys(packs[0]) : [];
     return NextResponse.json({
       hasKey: true,
       status: res.status,

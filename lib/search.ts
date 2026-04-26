@@ -30,7 +30,9 @@ export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
     }
 
     const data = await res.json();
-    const results: any[] = data.local_results ?? data.local_pack ?? [];
+    // local_packs is an array of pack sections; flatten all items across sections
+    const packs: any[] = data.local_packs ?? [];
+    const results: any[] = packs.flatMap((p: any) => p.locals ?? p.results ?? [p]).filter((r: any) => r.title);
     console.log(`[search] ScraperAPI returned ${results.length} local results`);
 
     return results
