@@ -22,7 +22,7 @@ const QUICK_VIBES = [
   "barkada brunch in Maginhawa",
   "solo coffee + thrift, Cubao",
   "first date, BGC, no fuss",
-  "antipolo escape sunday",
+  "antipolo half-day escape",
   "post-payday treat in Rockwell",
 ];
 
@@ -59,7 +59,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
         <Textarea
           value={vibe}
           onChange={(e) => setVibe(e.target.value)}
-          placeholder="rainy Saturday, ₱3K, with my partner, want comfort food and something weird after..."
+          placeholder="rainy afternoon in QC, ₱3K, with my partner, comfort food and something weird after..."
           className="min-h-[120px] text-base resize-none bg-card border-2 border-foreground/10 focus:border-primary/60 transition-colors rounded-xl px-4 py-3 leading-relaxed"
         />
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -154,7 +154,7 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
         disabled={!vibe.trim() || isLoading}
         className="group w-full inline-flex items-center justify-between rounded-full bg-foreground text-background pl-6 pr-2 py-2 text-base font-semibold shadow-[0_10px_30px_-8px_oklch(0.18_0.04_270/0.45)] hover:translate-y-[-1px] active:translate-y-[1px] transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
-        <span>{isLoading ? "Planning..." : "Build my Saturday"}</span>
+        <span>{isLoading ? "Planning..." : "Build my run"}</span>
         <span className="inline-flex items-center justify-center size-11 rounded-full bg-primary text-primary-foreground group-hover:rotate-[-12deg] transition-transform">
           <ArrowRight className="w-5 h-5" />
         </span>

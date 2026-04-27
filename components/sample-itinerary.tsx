@@ -1,15 +1,14 @@
 const SAMPLE = [
-  { time: "11:00", name: "Tablo Kitchen", area: "QC",       cost: 750, kind: "brunch" },
-  { time: "13:30", name: "Pinto Art Museum", area: "Antipolo", cost: 250, kind: "culture" },
-  { time: "16:00", name: "LOLA Cafe",     area: "Tomas Morato", cost: 400, kind: "coffee" },
-  { time: "19:30", name: "The Pearl Room", area: "Poblacion", cost: 900, kind: "drinks" },
+  { time: "11:00", name: "Tablo Kitchen",   area: "QC",            cost: 750, kind: "brunch" },
+  { time: "13:30", name: "Pinto Art Museum", area: "Antipolo",     cost: 250, kind: "culture" },
+  { time: "16:00", name: "LOLA Cafe",        area: "Tomas Morato", cost: 400, kind: "coffee" },
+  { time: "19:30", name: "The Pearl Room",   area: "Poblacion",    cost: 900, kind: "drinks" },
 ];
 
 export function SampleItinerary() {
   const total = SAMPLE.reduce((s, x) => s + x.cost, 0);
   return (
     <div className="float-card relative w-[290px] sm:w-[320px] md:w-[360px] rounded-2xl bg-card text-card-foreground shadow-[0_30px_70px_-20px_oklch(0.18_0.04_270/0.45)] border border-foreground/10 p-5 select-none">
-      {/* corner stamp */}
       <div className="absolute -top-3 -right-3 rotate-[10deg]">
         <div className="rounded-full bg-pop text-pop-foreground px-2.5 py-1 text-[10px] font-bold tracking-[0.18em] border border-foreground/20 shadow-sm">
           PLANNED
@@ -18,7 +17,7 @@ export function SampleItinerary() {
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">SAT · APR 27</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">SAMPLE PLAN</p>
           <p className="font-display text-lg font-bold leading-tight">Date crawl, QC to Poblacion</p>
         </div>
         <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground text-right">

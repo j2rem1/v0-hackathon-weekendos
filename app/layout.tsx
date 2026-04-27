@@ -21,8 +21,8 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'WeekendOS, Saturday in Manila, sorted.',
-  description: 'Type a vibe, get a timed Metro Manila itinerary. Real venues, honest budget, weather-aware. From Poblacion to QC.',
+  title: 'Gala — Manila, sorted.',
+  description: 'Type a vibe, get a timed Metro Manila itinerary in five seconds. Any day, any hour. Real venues, honest budget, weather-aware.',
   generator: 'v0.app',
   icons: {
     icon: [

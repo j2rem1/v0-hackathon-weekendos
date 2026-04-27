@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { planWeekend } from "@/lib/planner";
+import { planItinerary } from "@/lib/planner";
 import { searchVenuesByVibe } from "@/lib/search";
 import { PlanRequest } from "@/lib/types";
 
@@ -12,13 +12,13 @@ export async function POST(request: Request) {
     const body = (await request.json()) as PlanRequest;
 
     if (!body.vibe || typeof body.vibe !== "string") {
-      return NextResponse.json({ error: "Vibe description is required" }, { status: 400 });
+      return NextResponse.json({ error: "Tell me what you're up for, even one line." }, { status: 400 });
     }
     if (!body.budget_php || body.budget_php < 0) {
-      return NextResponse.json({ error: "Valid budget is required" }, { status: 400 });
+      return NextResponse.json({ error: "Set a budget per person." }, { status: 400 });
     }
     if (!body.party_size || body.party_size < 1) {
-      return NextResponse.json({ error: "Party size must be at least 1" }, { status: 400 });
+      return NextResponse.json({ error: "Party size must be at least 1." }, { status: 400 });
     }
 
     const planRequest: PlanRequest = {
@@ -30,31 +30,37 @@ export async function POST(request: Request) {
       exclude_ids: Array.isArray(body.exclude_ids) ? body.exclude_ids : [],
     };
 
-    let venuePool;
+    let search;
     try {
-      venuePool = await searchVenuesByVibe(planRequest.vibe);
+      search = await searchVenuesByVibe(planRequest.vibe);
     } catch (err: any) {
-      console.error("[plan-weekend] search failed:", err);
+      console.error("[plan] search failed:", err);
       return NextResponse.json(
         { error: `Venue search failed: ${err?.message ?? "unknown error"}` },
         { status: 502 }
       );
     }
 
-    if (venuePool.length === 0) {
+    if (search.venues.length === 0) {
       return NextResponse.json(
-        { error: "No venues returned from ScraperAPI — try a different vibe or check the key" },
+        { error: "No venues came back. Try a broader vibe or different area." },
         { status: 503 }
       );
     }
 
-    const result = planWeekend(planRequest, venuePool);
+    const result = planItinerary(planRequest, search.venues, {
+      area: search.area,
+      areaLocked: search.areaLocked,
+    });
 
     if (result.stops.length === 0) {
       return NextResponse.json(
         {
-          error: "Found venues but none matched your budget/time/weather constraints",
-          poolSize: venuePool.length,
+          error: search.areaLocked
+            ? `Found ${search.venues.length} ${search.area} venues but none fit your budget, time, or weather. Loosen one and try again.`
+            : "Found venues but none fit your budget, time, or weather. Try a wider window or higher budget.",
+          poolSize: search.venues.length,
+          area: search.area,
         },
         { status: 422 }
       );
@@ -62,7 +68,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error("[plan-weekend] unexpected error:", error);
+    console.error("[plan] unexpected error:", error);
     return NextResponse.json(
       { error: `Failed to generate plan: ${error?.message ?? "unknown"}` },
       { status: 500 }

@@ -12,6 +12,7 @@ import {
   Globe,
   RefreshCw,
   Star,
+  Lock,
 } from "lucide-react";
 import { PlanResult, ItineraryStop, VenueType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ function formatReviewCount(n: number): string {
   return String(n);
 }
 
-function TimelineStop({
+function StopCard({
   stop,
   index,
   isLast,
@@ -67,37 +68,37 @@ function TimelineStop({
   onSwap: (venueId: string) => void;
 }) {
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${stop.venue.lat},${stop.venue.lng}`;
-  const tiktokUrl = `https://www.tiktok.com/search?q=${encodeURIComponent(stop.venue.name + " Manila")}`;
+  const tiktokUrl = `https://www.tiktok.com/search?q=${encodeURIComponent(stop.venue.name + " " + stop.venue.area)}`;
   const igUrl = `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(stop.venue.name)}`;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
+    <motion.article
+      initial={{ opacity: 0, x: -16 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.15 }}
-      className="relative flex gap-4"
+      transition={{ duration: 0.4, delay: index * 0.12 }}
+      className="relative"
     >
-      {/* Timeline connector */}
-      <div className="flex flex-col items-center">
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl border-2 shadow-sm ${getTypeColor(stop.venue.type)}`}>
-          {getTypeIcon(stop.venue.type)}
+      <div className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto] gap-4 sm:gap-5 items-start rounded-2xl border border-border/60 bg-card p-4 sm:p-5 shadow-sm">
+        {/* Left rail: time bracket + type icon */}
+        <div className="flex flex-col items-center gap-2 min-w-[56px]">
+          <span className="font-mono text-[11px] tabular-nums font-bold text-foreground">{stop.startTime}</span>
+          <span
+            className={`size-11 sm:size-12 rounded-full flex items-center justify-center text-xl border-2 ${getTypeColor(stop.venue.type)}`}
+            aria-hidden
+          >
+            {getTypeIcon(stop.venue.type)}
+          </span>
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{stop.endTime}</span>
         </div>
-        {!isLast && (
-          <div className="w-px flex-1 min-h-[60px] mt-2 border-l border-dashed border-border" />
-        )}
-      </div>
 
-      {/* Stop content */}
-      <div className="flex-1 pb-8">
-        <div className="bg-card rounded-xl border border-border/50 p-4 shadow-sm">
-
-          {/* Award badges */}
+        {/* Middle: name + blurb + inline meta */}
+        <div className="min-w-0 flex flex-col gap-2">
           {stop.venue.awards && stop.venue.awards.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2">
+            <div className="flex flex-wrap gap-1.5">
               {stop.venue.awards.slice(0, 2).map((award) => (
                 <span
                   key={award}
-                  className="px-2 py-0.5 text-xs rounded-full bg-amber-100 border border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700/50 dark:text-amber-400 font-medium"
+                  className="px-2 py-0.5 text-[10px] rounded-full bg-amber-100 border border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700/50 dark:text-amber-400 font-medium"
                 >
                   🏆 {award}
                 </span>
@@ -105,128 +106,115 @@ function TimelineStop({
             </div>
           )}
 
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-semibold text-foreground text-balance">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="font-display text-lg sm:text-xl font-bold leading-tight tracking-tight text-foreground text-balance">
               {stop.venue.name}
             </h3>
-            <div className="flex items-center gap-2 shrink-0">
-              {stop.venue.website && (
-                <a
-                  href={stop.venue.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  title="Website"
-                >
-                  <Globe className="w-3 h-3" />
-                </a>
-              )}
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Map
-              </a>
-            </div>
+            <span className="sm:hidden font-mono tabular-nums text-base font-extrabold text-foreground shrink-0">
+              ₱{stop.totalCost.toLocaleString()}
+            </span>
           </div>
 
-          {/* Blurb */}
-          <p className="text-sm text-muted-foreground mb-3 text-pretty">
+          <p className="text-sm text-muted-foreground leading-snug text-pretty line-clamp-2">
             {stop.venue.blurb}
           </p>
 
-          {/* Meta info */}
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
             {stop.venue.rating && (
-              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
                 <Star className="w-3.5 h-3.5 fill-current" />
                 {stop.venue.rating.toFixed(1)}
                 {stop.venue.reviewCount && (
-                  <span className="text-muted-foreground font-normal">
-                    ({formatReviewCount(stop.venue.reviewCount)})
-                  </span>
+                  <span className="text-muted-foreground font-normal">({formatReviewCount(stop.venue.reviewCount)})</span>
                 )}
               </span>
             )}
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {stop.startTime} – {stop.endTime}
-            </span>
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5" />
-              {stop.venue.area}
-            </span>
-            <span className="flex items-center gap-1">
-              <Wallet className="w-3.5 h-3.5" />
-              ₱{stop.totalCost.toLocaleString()}
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" />{stop.venue.area}
             </span>
             {stop.venue.weatherProof ? (
-              <span className="flex items-center gap-1 text-emerald-600">
-                <Umbrella className="w-3.5 h-3.5" />
-                Indoor
+              <span className="inline-flex items-center gap-1 text-emerald-600">
+                <Umbrella className="w-3.5 h-3.5" />Indoor
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-amber-600">
-                <Sun className="w-3.5 h-3.5" />
-                Outdoor
+              <span className="inline-flex items-center gap-1 text-amber-600">
+                <Sun className="w-3.5 h-3.5" />Outdoor
               </span>
             )}
-          </div>
-
-          {/* Vibe tags */}
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {stop.venue.vibe.map((v) => (
+            {stop.venue.vibe.slice(0, 3).map((v) => (
               <span
                 key={v}
-                className="px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground"
+                className="px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[11px]"
               >
                 {v}
               </span>
             ))}
           </div>
 
-          {/* Social + replace row */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
+          {/* Mobile-only action row */}
+          <div className="sm:hidden flex items-center justify-between gap-3 pt-2 mt-1 border-t border-border/50">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <a
-                href={tiktokUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-foreground transition-colors"
-              >
-                TikTok ↗
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary">
+                <ExternalLink className="w-3 h-3" />Map
               </a>
-              <a
-                href={igUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-foreground transition-colors"
-              >
-                Instagram ↗
-              </a>
+              <a href={tiktokUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">TikTok ↗</a>
+              <a href={igUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">IG ↗</a>
             </div>
             <button
               onClick={() => onSwap(stop.venue.id)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
             >
-              <RefreshCw className="w-3 h-3" />
-              Replace this stop
+              <RefreshCw className="w-3 h-3" />Swap
             </button>
           </div>
         </div>
 
-        {/* Transit indicator */}
-        {!isLast && (
-          <div className="mt-3 ml-1 text-xs text-muted-foreground italic">
-            ~30 min transit
+        {/* Right rail: cost + links + swap (sm and up) */}
+        <div className="hidden sm:flex flex-col items-end justify-between gap-3 min-w-[112px] self-stretch">
+          <span className="font-mono tabular-nums text-2xl font-extrabold text-foreground leading-none">
+            ₱{stop.totalCost.toLocaleString()}
+          </span>
+          <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />Map
+            </a>
+            {stop.venue.website && (
+              <a
+                href={stop.venue.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground inline-flex items-center gap-1"
+              >
+                <Globe className="w-3 h-3" />Site
+              </a>
+            )}
+            <a href={tiktokUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">TikTok ↗</a>
+            <a href={igUrl} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Instagram ↗</a>
           </div>
-        )}
+          <button
+            onClick={() => onSwap(stop.venue.id)}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors border border-border/60 rounded-full px-3 py-1"
+          >
+            <RefreshCw className="w-3 h-3" />Swap
+          </button>
+        </div>
       </div>
-    </motion.div>
+
+      {/* Transit between stops */}
+      {!isLast && (
+        <div className="flex items-center gap-2 pl-7 my-3 text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          <span aria-hidden className="size-1 rounded-full bg-foreground/30" />
+          <span aria-hidden className="size-1 rounded-full bg-foreground/30" />
+          <span aria-hidden className="size-1 rounded-full bg-foreground/30" />
+          <span>~30 min transit</span>
+        </div>
+      )}
+    </motion.article>
   );
 }
 
@@ -254,17 +242,27 @@ export function ItineraryTimeline({ result, onReset, onSwap }: ItineraryTimeline
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="w-full max-w-lg mx-auto"
+      className="w-full max-w-2xl mx-auto"
     >
-      {/* Summary Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-6 p-5 rounded-2xl bg-primary/10 border border-primary/25"
       >
-        <h2 className="font-black text-xl text-foreground mb-3 tracking-tight">
-          Your Weekend Plan
-        </h2>
+        <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+          <h2 className="font-display font-extrabold text-xl sm:text-2xl text-foreground tracking-tight">
+            Your {result.area} run
+          </h2>
+          {result.areaLocked ? (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-primary">
+              <Lock className="w-3 h-3" />Locked to {result.area}
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
+              Wider Metro Manila
+            </span>
+          )}
+        </div>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Clock className="w-4 h-4" />
@@ -290,10 +288,9 @@ export function ItineraryTimeline({ result, onReset, onSwap }: ItineraryTimeline
         </div>
       </motion.div>
 
-      {/* Timeline */}
       <div className="space-y-0">
         {result.stops.map((stop, index) => (
-          <TimelineStop
+          <StopCard
             key={stop.venue.id}
             stop={stop}
             index={index}
@@ -303,11 +300,10 @@ export function ItineraryTimeline({ result, onReset, onSwap }: ItineraryTimeline
         ))}
       </div>
 
-      {/* Actions */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: result.stops.length * 0.15 + 0.3 }}
+        transition={{ delay: result.stops.length * 0.12 + 0.3 }}
         className="mt-8 flex gap-3"
       >
         <Button onClick={onReset} variant="outline" className="flex-1 gap-2">

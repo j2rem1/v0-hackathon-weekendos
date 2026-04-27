@@ -16,6 +16,57 @@ interface RawPack {
   position?: number;
 }
 
+export interface SearchResult {
+  venues: Venue[];
+  area: string;        // canonical, always set ("Metro Manila" on fallback)
+  areaLocked: boolean; // true when extracted from input
+}
+
+// Patterns are scanned both ways: against user vibe text AND against ScraperAPI
+// detail strings (which often concat without spaces, e.g. "RestaurantQuezon City").
+// Order matters — first match wins, so neighbourhoods belonging to a parent
+// city sit alongside the city itself ("Poblacion" → "Makati").
+const AREA_KEYWORDS: { area: string; pattern: RegExp }[] = [
+  { area: "BGC",          pattern: /(bgc|bonifacio global city|fort bonifacio)/i },
+  { area: "Makati",       pattern: /(makati|salcedo|legaspi|poblacion|rockwell)/i },
+  { area: "QC",           pattern: /(quezon city|\bqc\b|cubao|maginhawa|katipunan|diliman|fairview|tomas morato|timog|new manila)/i },
+  { area: "Taguig",       pattern: /taguig/i },
+  { area: "Antipolo",     pattern: /antipolo/i },
+  { area: "Pasig",        pattern: /(pasig|kapitolyo|capitol commons|ortigas)/i },
+  { area: "Pasay",        pattern: /(pasay|mall of asia|moa)/i },
+  { area: "Mandaluyong",  pattern: /(mandaluyong|greenfield)/i },
+  { area: "San Juan",     pattern: /san juan/i },
+  { area: "Manila",       pattern: /(ermita|malate|intramuros|binondo|escolta|chinatown|\bmanila\b)/i },
+];
+
+// Search-query hints biased to each area so ScraperAPI surfaces in-area venues.
+const AREA_QUERY_HINT: Record<string, string> = {
+  "BGC":         "BGC Taguig Metro Manila",
+  "Makati":      "Makati Metro Manila",
+  "QC":          "Quezon City Metro Manila",
+  "Taguig":      "Taguig Metro Manila",
+  "Antipolo":    "Antipolo Rizal",
+  "Pasig":       "Pasig Metro Manila",
+  "Pasay":       "Pasay Metro Manila",
+  "Mandaluyong": "Mandaluyong Metro Manila",
+  "San Juan":    "San Juan Metro Manila",
+  "Manila":      "Manila Philippines",
+};
+
+export function extractArea(text: string): { area: string | null; canonical: string } {
+  for (const { area, pattern } of AREA_KEYWORDS) {
+    if (pattern.test(text)) return { area, canonical: area };
+  }
+  return { area: null, canonical: "Metro Manila" };
+}
+
+function inferAreaFromHaystack(haystack: string): string {
+  for (const { area, pattern } of AREA_KEYWORDS) {
+    if (pattern.test(haystack)) return area;
+  }
+  return "Metro Manila";
+}
+
 async function fetchQuery(key: string, query: string): Promise<RawPack[]> {
   const url = new URL(SCRAPERAPI_BASE);
   url.searchParams.set("api_key", key);
@@ -39,12 +90,13 @@ async function fetchQuery(key: string, query: string): Promise<RawPack[]> {
   }
 }
 
-export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
+export async function searchVenuesByVibe(vibe: string): Promise<SearchResult> {
   const key = process.env.SCRAPERAPI_KEY;
   if (!key) throw new Error("SCRAPERAPI_KEY is not set");
 
-  const queries = buildQueries(vibe);
-  console.log(`[search] firing ${queries.length} queries for vibe: "${vibe}"`);
+  const { area } = extractArea(vibe);
+  const queries = buildQueries(vibe, area);
+  console.log(`[search] area="${area ?? "Metro Manila (fallback)"}" firing ${queries.length} queries`);
 
   const batches = await Promise.all(queries.map((q) => fetchQuery(key, q)));
 
@@ -60,14 +112,32 @@ export async function searchVenuesByVibe(vibe: string): Promise<Venue[]> {
     }
   }
 
-  console.log(`[search] merged ${merged.length} unique venues from ScraperAPI`);
+  console.log(`[search] merged ${merged.length} unique venues`);
 
-  return merged
+  const allVenues = merged
     .map((r, i) => mapToVenue(r, i))
     .filter((v): v is Venue => v !== null);
+
+  // Location binding — if the user named an area, only return matching venues.
+  // Fall back to the full pool when the strict filter would leave too few stops
+  // to plan an itinerary (≥3 keeps a 4-stop plan possible).
+  if (area) {
+    const inArea = allVenues.filter((v) => v.area === area);
+    if (inArea.length >= 3) {
+      console.log(`[search] locked to ${area} → ${inArea.length} venues`);
+      return { venues: inArea, area, areaLocked: true };
+    }
+    console.warn(`[search] only ${inArea.length} venues match "${area}" — falling back to wider pool`);
+  }
+
+  return {
+    venues: allVenues,
+    area: area ?? "Metro Manila",
+    areaLocked: false,
+  };
 }
 
-function buildQueries(vibe: string): string[] {
+function buildQueries(vibe: string, area: string | null): string[] {
   const lower = vibe.toLowerCase();
   const modifiers: string[] = [];
 
@@ -79,7 +149,7 @@ function buildQueries(vibe: string): string[] {
   if (/trending|popular|viral|hyped/.test(lower)) modifiers.push("trending popular");
 
   const mod = modifiers.length ? modifiers.join(" ") + " " : "";
-  const region = "Metro Manila Philippines";
+  const region = area ? AREA_QUERY_HINT[area] ?? area : "Metro Manila Philippines";
 
   // Always fire a broad baseline so the pool is never empty regardless of vibe.
   const queries = new Set<string>([
@@ -89,12 +159,11 @@ function buildQueries(vibe: string): string[] {
     `things to do ${region}`,
   ]);
 
-  // Add vibe-targeted queries
   if (/food|eat|hungry|foodie|brunch/.test(lower)) {
     queries.add(`best ${mod}brunch spots ${region}`);
   }
   if (/bar|night|drink|cocktail|party/.test(lower)) {
-    queries.add(`best ${mod}cocktail bars Poblacion Makati`);
+    queries.add(`best ${mod}cocktail bars ${region}`);
   }
   if (/coffee|cafe|chill/.test(lower)) {
     queries.add(`best specialty coffee shops ${region}`);
@@ -124,21 +193,6 @@ const TYPE_KEYWORDS: { type: VenueType; words: string[] }[] = [
                               "filipino", "japanese", "korean", "italian", "chinese", "thai", "vietnamese",
                               "mexican", "spanish", "french", "american", "fusion", "ramen", "sushi",
                               "pizzeria", "bbq", "steakhouse", "seafood", "vegetarian", "vegan", "brunch"] },
-];
-
-// Patterns intentionally omit leading word boundaries — ScraperAPI concats
-// detail strings without spaces ("RestaurantQuezon City, Metro Manila").
-const AREA_KEYWORDS: { area: string; pattern: RegExp }[] = [
-  { area: "BGC",          pattern: /(bgc|bonifacio global city|fort bonifacio)/i },
-  { area: "Makati",       pattern: /(makati|salcedo|legaspi|poblacion|rockwell)/i },
-  { area: "QC",           pattern: /(quezon city|cubao|maginhawa|katipunan|diliman|fairview|tomas morato|timog)/i },
-  { area: "Taguig",       pattern: /taguig/i },
-  { area: "Antipolo",     pattern: /antipolo/i },
-  { area: "Pasig",        pattern: /(pasig|kapitolyo|capitol commons|ortigas)/i },
-  { area: "Pasay",        pattern: /(pasay|mall of asia)/i },
-  { area: "Mandaluyong",  pattern: /mandaluyong/i },
-  { area: "San Juan",     pattern: /san juan/i },
-  { area: "Manila",       pattern: /(ermita|malate|intramuros|binondo|escolta|chinatown|manila)/i },
 ];
 
 interface ParsedDetails {
@@ -223,13 +277,6 @@ function priceToCost(price: string, type: VenueType): number {
   return Math.round((lo + (isNaN(hi) ? lo : hi)) / 2);
 }
 
-function inferArea(haystack: string): string {
-  for (const { area, pattern } of AREA_KEYWORDS) {
-    if (pattern.test(haystack)) return area;
-  }
-  return "Metro Manila";
-}
-
 function defaultHours(type: VenueType): { opens: string; closes: string } {
   const defaults: Record<VenueType, { opens: string; closes: string }> = {
     food:    { opens: "10:00", closes: "22:00" },
@@ -259,7 +306,7 @@ function mapToVenue(result: RawPack, index: number): Venue | null {
   return {
     id: `scraper-${result.position ?? index}-${result.title.slice(0, 12).replace(/\s/g, "")}`,
     name: result.title,
-    area: inferArea(haystack),
+    area: inferAreaFromHaystack(haystack),
     type,
     vibe: inferVibes(lower, type, priceLine),
     cost: priceToCost(priceLine, type),

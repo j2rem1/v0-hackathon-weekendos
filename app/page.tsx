@@ -20,7 +20,7 @@ const VIBES = [
   "solo coffee + thrift in Cubao",
   "date night, BGC steakhouse, no fuss",
   "katipunan late cravings",
-  "antipolo escape sunday",
+  "antipolo half-day escape",
   "first-date safe pick, under ₱1.5K",
   "art walk, then drinks in Salcedo",
   "rainy day, comfort food only",
@@ -38,7 +38,7 @@ export default function Home() {
     setState("loading");
     setErrorMsg(null);
     try {
-      const response = await fetch("/api/plan-weekend", {
+      const response = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, exclude_ids: excluded }),
@@ -142,10 +142,9 @@ export default function Home() {
 function Wordmark({ tone = "ink" }: { tone?: "ink" | "cream" }) {
   const color = tone === "ink" ? "text-foreground" : "text-hero-foreground";
   return (
-    <a href="/" className={`group inline-flex items-baseline gap-1.5 font-display font-extrabold tracking-tight ${color}`}>
-      <span className="text-xl">weekend</span>
-      <span className="text-xl text-primary group-hover:rotate-6 transition-transform duration-300 inline-block">os</span>
-      <span aria-hidden className="ml-1 inline-block size-1.5 rounded-full bg-primary translate-y-[-2px]" />
+    <a href="/" className={`group inline-flex items-baseline font-display font-extrabold tracking-tight ${color}`}>
+      <span className="text-xl">gala</span>
+      <span className="text-xl text-primary group-hover:rotate-12 transition-transform duration-300 inline-block">.</span>
     </a>
   );
 }
@@ -153,29 +152,19 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "cream" }) {
 function HeroSurface({ onPlan }: { onPlan: () => void }) {
   return (
     <section className="relative isolate overflow-hidden bg-hero text-hero-foreground">
-      {/* skyline behind type, anchored to bottom */}
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-[60%] text-hero-deep">
         <ManilaSkyline className="w-full h-full" />
       </div>
-      {/* sun glow, top right */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-32 -right-32 w-[640px] h-[640px] rounded-full opacity-60"
         style={{ background: "radial-gradient(circle, oklch(0.92 0.16 78) 0%, transparent 60%)" }}
       />
-      {/* film grain */}
       <div className="grain absolute inset-0" />
 
-      {/* header */}
       <div className="relative z-10 mx-auto max-w-7xl px-5 sm:px-8 pt-6 flex items-center justify-between">
         <Wordmark tone="cream" />
-        <div className="flex items-center gap-3">
-          <span className="hidden md:inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-background/30 backdrop-blur px-3 py-1.5 text-xs font-mono uppercase tracking-[0.18em]">
-            <span aria-hidden className="size-1.5 rounded-full bg-primary animate-pulse" />
-            Manila, Fri 9:42 PM
-          </span>
-          <ThemeToggle />
-        </div>
+        <ThemeToggle />
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-5 sm:px-8 pt-12 sm:pt-20 pb-28 sm:pb-36 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-6 items-end">
@@ -188,7 +177,7 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
           >
             <span className="inline-flex items-center gap-2 rounded-full border border-foreground/25 px-3 py-1.5">
               <span className="size-1.5 rounded-full bg-primary" />
-              Friday Night, Metro Manila
+              Any day, any hour, Metro Manila
             </span>
           </motion.p>
 
@@ -199,11 +188,8 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
             className="font-display font-extrabold leading-[0.92] tracking-[-0.035em] text-balance"
             style={{ fontSize: "clamp(3.4rem, 9.5vw, 8rem)" }}
           >
-            Saturday<br />
-            <span className="inline-flex items-baseline">
-              in Manila,
-            </span>
-            <br />
+            Free hours,<br />
+            in Manila,<br />
             <span className="relative inline-block italic text-primary">
               sorted.
               <svg
@@ -229,7 +215,7 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
             transition={{ duration: 0.55, delay: 0.32 }}
             className="mt-7 max-w-[58ch] text-base sm:text-lg leading-relaxed text-foreground/80"
           >
-            Type a vibe, get a timed itinerary in five seconds. Real venues across QC, Makati, BGC, and Poblacion. Honest budget, weather-aware, no group-chat purgatory.
+            Type a vibe, name your area, get a timed itinerary in five seconds. Tonight, tomorrow, your day off, that random Tuesday afternoon. Real venues, honest budget, weather-aware, no group-chat purgatory.
           </motion.p>
 
           <motion.div
@@ -242,7 +228,7 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
               onClick={onPlan}
               className="group inline-flex items-center gap-2.5 rounded-full bg-foreground text-background pl-6 pr-2.5 py-2.5 font-semibold text-base shadow-[0_10px_30px_-8px_oklch(0.18_0.04_270/0.5)] hover:translate-y-[-1px] active:translate-y-[1px] transition-transform"
             >
-              Plan tonight
+              Tara, plan it
               <span className="inline-flex items-center justify-center size-9 rounded-full bg-primary text-primary-foreground group-hover:rotate-[-12deg] transition-transform">
                 <ArrowRight className="w-4 h-4" />
               </span>
@@ -266,14 +252,12 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
           </motion.div>
         </div>
 
-        {/* pinned itinerary proof — anchored bottom-right */}
         <motion.div
           initial={{ opacity: 0, y: 30, rotate: 8 }}
           animate={{ opacity: 1, y: 0, rotate: 3.5 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.55 }}
           className="lg:col-span-5 xl:col-span-5 flex justify-center lg:justify-end relative"
         >
-          {/* pin */}
           <div aria-hidden className="absolute -top-3 right-6 lg:right-12 z-20 size-3 rounded-full bg-primary shadow-[0_4px_8px_oklch(0.18_0.04_270/0.4)]" />
           <SampleItinerary />
         </motion.div>
@@ -313,8 +297,8 @@ function Proof() {
 
 function HowItWorks({ onPlan }: { onPlan: () => void }) {
   const steps = [
-    { n: "1", title: "Type a vibe.", body: "\"Rainy date in QC, ₱3K, comfort food, ends early.\" The messier the better." },
-    { n: "2", title: "We score the city.", body: "Live venues across food, art, bars, and outdoor get ranked against your vibe, budget, and the forecast." },
+    { n: "1", title: "Type a vibe.", body: "\"Rainy date in QC, ₱3K, comfort food, ends early.\" The messier the better. Drop an area and we lock to it." },
+    { n: "2", title: "We score the city.", body: "Live venues across food, art, bars, and outdoor get ranked against your vibe, budget, area, and the forecast." },
     { n: "3", title: "You get a timed run.", body: "Stops, costs, transit gaps, totals. Swap any stop you don't like with one tap." },
   ];
   return (
@@ -365,7 +349,7 @@ function Stats() {
           className="font-display font-extrabold tracking-[-0.025em] text-balance"
           style={{ fontSize: "clamp(1.8rem, 3.6vw, 2.8rem)", lineHeight: 1.15 }}
         >
-          Built by Manileños tired of opening Google Maps at 11am, scrolling Reddit for thirty minutes, and ending up at the same Salcedo brunch spot anyway.
+          Built by Manileños tired of opening Google Maps mid-week, scrolling Reddit for thirty minutes, and ending up at the same Salcedo brunch spot anyway.
         </p>
         <div className="mt-10 inline-flex items-center gap-3 rounded-full border border-background/25 px-4 py-2 text-xs font-mono uppercase tracking-[0.22em] text-background/70">
           <span aria-hidden className="size-1.5 rounded-full bg-primary" />

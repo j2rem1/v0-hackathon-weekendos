@@ -66,4 +66,6 @@ export interface PlanResult {
   totalBudget: number;
   totalDuration: number; // minutes
   weatherProof: boolean;
+  area: string; // canonical area the plan is locked to ("BGC", "QC", "Metro Manila"…)
+  areaLocked: boolean; // true when extracted from vibe text, false on fallback
 }
