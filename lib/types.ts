@@ -31,6 +31,7 @@ export interface Venue {
   type: VenueType;
   vibe: Vibe[];
   cost: number; // PHP per person
+  costEstimated: boolean; // true when cost was inferred from a tier indicator or category fallback rather than an explicit ₱-amount
   duration: number; // minutes
   opens: string; // HH:MM
   closes: string; // HH:MM
@@ -38,34 +39,61 @@ export interface Venue {
   blurb: string;
   lat: number;
   lng: number;
-  // enriched from SerpAPI
   website?: string;
   rating?: number;
   reviewCount?: number;
   awards?: string[];
+  instagram?: string;
+  // Raw search-result text we keep so the recommender can mine it for bias signals.
+  haystack?: string;
 }
 
-export interface PlanRequest {
+export type MealKind = "breakfast" | "brunch" | "lunch" | "dinner" | "drinks" | null;
+export type OccasionKind = "date" | "group" | "solo" | "family" | "work" | "casual" | null;
+
+export interface RecommendRequest {
   vibe: string;
   budget_php: number;
   party_size: number;
-  start_time: string; // HH:MM
-  end_time: string; // HH:MM
-  exclude_ids?: string[]; // venues to skip (used by swap flow)
+  exclude_ids?: string[];
 }
 
-export interface ItineraryStop {
+export interface ParsedIntent {
+  rawQuery: string;
+  location: string;             // canonical area; "Metro Manila" when nothing extracted
+  locationLocked: boolean;      // hard filter — drop out-of-area venues when true
+  cuisine: string | null;       // hard filter — drop venues that don't match this cuisine when set
+  occasion: OccasionKind;
+  meal: MealKind;               // soft signal that feeds the context score
+  vibeDescriptors: string[];    // abstract descriptors mined from the query: "intimate", "weird", "trendy", etc.
+}
+
+export interface ScoreBreakdown {
+  context: number;   // 0..1 — scenario coherence (meal-window fit, type-for-time)
+  cuisine: number;   // 0 or 1 — binary; 1 when no cuisine specified or cuisine matches
+  vibe: number;      // 0..1 — abstract descriptor match
+  occasion: number;  // 0..1 — date/group/solo/etc. fit
+  sentiment: number; // 0..1 — bias triggers + rating quality
+  final: number;     // weighted sum, 0..1
+}
+
+export interface BiasSignals {
+  positive: string[];   // matched positive trigger phrases
+  negative: string[];   // matched negative trigger phrases
+  netSentiment: number; // -1..1
+}
+
+export interface Recommendation {
   venue: Venue;
-  startTime: string; // HH:MM
-  endTime: string; // HH:MM
-  totalCost: number; // cost × party_size
+  score: ScoreBreakdown;
+  bias: BiasSignals;
+  why: string[]; // 2-3 short, human-readable bullets
 }
 
-export interface PlanResult {
-  stops: ItineraryStop[];
-  totalBudget: number;
-  totalDuration: number; // minutes
-  weatherProof: boolean;
-  area: string; // canonical area the plan is locked to ("BGC", "QC", "Metro Manila"…)
-  areaLocked: boolean; // true when extracted from vibe text, false on fallback
+export interface RecommendResult {
+  intent: ParsedIntent;
+  primary: Recommendation;
+  alternates: Recommendation[]; // empty when confidence === "high"
+  confidence: "high" | "low";
+  poolSize: number;
 }

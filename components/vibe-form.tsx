@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Users, Wallet, Clock } from "lucide-react";
+import { ArrowRight, Users, Wallet } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 
@@ -11,8 +11,6 @@ interface VibeFormProps {
     vibe: string;
     budget_php: number;
     party_size: number;
-    start_time: string;
-    end_time: string;
   }) => void;
   isLoading: boolean;
 }
@@ -30,13 +28,11 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
   const [vibe, setVibe] = useState("");
   const [budget, setBudget] = useState(3000);
   const [partySize, setPartySize] = useState(2);
-  const [startTime, setStartTime] = useState("10:00");
-  const [endTime, setEndTime] = useState("22:00");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!vibe.trim()) return;
-    onSubmit({ vibe, budget_php: budget, party_size: partySize, start_time: startTime, end_time: endTime });
+    onSubmit({ vibe, budget_php: budget, party_size: partySize });
   };
 
   return (
@@ -127,34 +123,12 @@ export function VibeForm({ onSubmit, isLoading }: VibeFormProps) {
         </div>
       </div>
 
-      {/* Time window */}
-      <div className="mb-10">
-        <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground/85 mb-3">
-          <Clock className="w-4 h-4" /> Time window
-        </label>
-        <div className="flex items-center gap-3">
-          <input
-            type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-lg bg-card border-2 border-foreground/10 text-base font-mono tabular-nums focus:border-primary/60 focus:outline-none transition-colors"
-          />
-          <span className="text-muted-foreground text-sm">to</span>
-          <input
-            type="time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-lg bg-card border-2 border-foreground/10 text-base font-mono tabular-nums focus:border-primary/60 focus:outline-none transition-colors"
-          />
-        </div>
-      </div>
-
       <button
         type="submit"
         disabled={!vibe.trim() || isLoading}
         className="group w-full inline-flex items-center justify-between rounded-full bg-foreground text-background pl-6 pr-2 py-2 text-base font-semibold shadow-[0_10px_30px_-8px_oklch(0.18_0.04_270/0.45)] hover:translate-y-[-1px] active:translate-y-[1px] transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
       >
-        <span>{isLoading ? "Planning..." : "Build my run"}</span>
+        <span>{isLoading ? "Looking..." : "Find my pick"}</span>
         <span className="inline-flex items-center justify-center size-11 rounded-full bg-primary text-primary-foreground group-hover:rotate-[-12deg] transition-transform">
           <ArrowRight className="w-5 h-5" />
         </span>

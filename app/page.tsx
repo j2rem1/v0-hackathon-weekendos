@@ -4,15 +4,17 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { VibeForm } from "@/components/vibe-form";
-import { ItineraryTimeline } from "@/components/itinerary-timeline";
+import { RecommendationStack } from "@/components/recommendation-stack";
 import { LoadingState } from "@/components/loading-state";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ManilaSkyline } from "@/components/manila-skyline";
 import { VibeMarquee } from "@/components/vibe-marquee";
-import { SampleItinerary } from "@/components/sample-itinerary";
-import { PlanResult, PlanRequest } from "@/lib/types";
+import { SampleRecommendation } from "@/components/sample-recommendation";
+import { RecommendResult, RecommendRequest } from "@/lib/types";
 
 type AppState = "hero" | "form" | "loading" | "results";
+
+type FormSubmit = Omit<RecommendRequest, "exclude_ids">;
 
 const VIBES = [
   "rainy poblacion crawl, ₱2K",
@@ -29,23 +31,36 @@ const VIBES = [
 
 export default function Home() {
   const [state, setState] = useState<AppState>("hero");
-  const [result, setResult] = useState<PlanResult | null>(null);
-  const [lastRequest, setLastRequest] = useState<Omit<PlanRequest, "exclude_ids"> | null>(null);
-  const [excludedIds, setExcludedIds] = useState<string[]>([]);
+  const [results, setResults] = useState<RecommendResult[]>([]);
+  const [baseRequest, setBaseRequest] = useState<FormSubmit | null>(null);
+  const [stackLoading, setStackLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const runPlan = async (data: Omit<PlanRequest, "exclude_ids">, excluded: string[]) => {
-    setState("loading");
+  const fetchRecommendation = async (
+    payload: FormSubmit & { vibe: string },
+    excludeIds: string[]
+  ): Promise<RecommendResult> => {
+    const response = await fetch("/api/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, exclude_ids: excludeIds }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(json?.error || `Request failed (${response.status})`);
+    return json as RecommendResult;
+  };
+
+  const collectShownIds = (rs: RecommendResult[]) =>
+    rs.flatMap((r) => [r.primary.venue.id, ...r.alternates.map((a) => a.venue.id)]);
+
+  const handleSubmit = async (data: FormSubmit) => {
+    setBaseRequest(data);
+    setResults([]);
     setErrorMsg(null);
+    setState("loading");
     try {
-      const response = await fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, exclude_ids: excluded }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || `Request failed (${response.status})`);
-      setResult(payload as PlanResult);
+      const result = await fetchRecommendation(data, []);
+      setResults([result]);
       setState("results");
     } catch (error: any) {
       console.error("Error:", error);
@@ -54,22 +69,28 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (data: Omit<PlanRequest, "exclude_ids">) => {
-    setLastRequest(data);
-    setExcludedIds([]);
-    await runPlan(data, []);
-  };
-
-  const handleSwap = async (venueId: string) => {
-    if (!lastRequest) return;
-    const newExcluded = [...excludedIds, venueId];
-    setExcludedIds(newExcluded);
-    await runPlan(lastRequest, newExcluded);
+  const handleAskAgain = async (followUpVibe: string) => {
+    if (!baseRequest) return;
+    setStackLoading(true);
+    setErrorMsg(null);
+    try {
+      const result = await fetchRecommendation(
+        { ...baseRequest, vibe: followUpVibe },
+        collectShownIds(results)
+      );
+      setResults((prev) => [...prev, result]);
+    } catch (error: any) {
+      console.error("Error:", error);
+      setErrorMsg(error?.message ?? "Couldn't find another one");
+    } finally {
+      setStackLoading(false);
+    }
   };
 
   const handleReset = () => {
-    setResult(null);
-    setExcludedIds([]);
+    setResults([]);
+    setBaseRequest(null);
+    setErrorMsg(null);
     setState("form");
   };
 
@@ -120,7 +141,7 @@ export default function Home() {
           </motion.div>
         )}
 
-        {state === "results" && result && (
+        {state === "results" && results.length > 0 && (
           <motion.div
             key="results"
             initial={{ opacity: 0, y: 20 }}
@@ -128,7 +149,13 @@ export default function Home() {
             exit={{ opacity: 0, y: -20 }}
           >
             <FormShell onBack={() => setState("hero")}>
-              <ItineraryTimeline result={result} onReset={handleReset} onSwap={handleSwap} />
+              <RecommendationStack
+                results={results}
+                isLoading={stackLoading}
+                errorMsg={errorMsg}
+                onAskAgain={handleAskAgain}
+                onReset={handleReset}
+              />
             </FormShell>
           </motion.div>
         )}
@@ -215,7 +242,7 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
             transition={{ duration: 0.55, delay: 0.32 }}
             className="mt-7 max-w-[58ch] text-base sm:text-lg leading-relaxed text-foreground/80"
           >
-            Type a vibe, name your area, get a timed itinerary in five seconds. Tonight, tomorrow, your day off, that random Tuesday afternoon. Real venues, honest budget, weather-aware, no group-chat purgatory.
+            Type a vibe, name your area, get one honest pick — with the why, the buzz, and the cost. Tonight, tomorrow, your day off, that random Tuesday afternoon. Not vibing? Ask for another. No group-chat purgatory.
           </motion.p>
 
           <motion.div
@@ -259,7 +286,7 @@ function HeroSurface({ onPlan }: { onPlan: () => void }) {
           className="lg:col-span-5 xl:col-span-5 flex justify-center lg:justify-end relative"
         >
           <div aria-hidden className="absolute -top-3 right-6 lg:right-12 z-20 size-3 rounded-full bg-primary shadow-[0_4px_8px_oklch(0.18_0.04_270/0.4)]" />
-          <SampleItinerary />
+          <SampleRecommendation />
         </motion.div>
       </div>
     </section>
@@ -297,9 +324,9 @@ function Proof() {
 
 function HowItWorks({ onPlan }: { onPlan: () => void }) {
   const steps = [
-    { n: "1", title: "Type a vibe.", body: "\"Rainy date in QC, ₱3K, comfort food, ends early.\" The messier the better. Drop an area and we lock to it." },
-    { n: "2", title: "We score the city.", body: "Live venues across food, art, bars, and outdoor get ranked against your vibe, budget, area, and the forecast." },
-    { n: "3", title: "You get a timed run.", body: "Stops, costs, transit gaps, totals. Swap any stop you don't like with one tap." },
+    { n: "1", title: "Type a vibe.", body: "\"Quiet date in QC, ₱2K, comfort food, no fuss.\" The messier the better. Drop an area and we lock to it." },
+    { n: "2", title: "We score the city.", body: "Live venues get ranked across location, vibe match, meal fit, local buzz, and rating — composite score, not vibes-based." },
+    { n: "3", title: "One pick, with the why.", body: "Name, cost, the three reasons it fits. Not it? Ask for another in one tap; we exclude what we already showed you." },
   ];
   return (
     <section id="how" className="relative bg-background py-20 sm:py-28">

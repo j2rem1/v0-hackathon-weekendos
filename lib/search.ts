@@ -1,11 +1,18 @@
 import { Venue, VenueType, Vibe } from "./types";
+import { CUISINE_DEFS, VIBE_DESCRIPTORS } from "./recommend";
 
 const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/google/search";
 
-const AWARD_KEYWORDS = [
-  "michelin", "asia's 50 best", "world's 50 best", "50 best",
-  "tatler", "miele guide", "cnn travel", "award", "best restaurant",
-  "zagat", "james beard", "bib gourmand",
+// Award detection requires a strong phrase context, not a bare keyword.
+// "michelin-trained chef" or "award-winning kitchen" must NOT pass — only an
+// actual recognition (Michelin star/guide, Bib Gourmand, 50 Best listing, etc.).
+const AWARD_PATTERNS: { label: string; pattern: RegExp }[] = [
+  { label: "Michelin",        pattern: /\bmichelin[- ]?(?:star(?:red|s)?|guide|recommended|selected)\b/i },
+  { label: "Bib Gourmand",    pattern: /\bbib gourmand\b/i },
+  { label: "Asia's 50 Best",  pattern: /asia['']?s 50 best (?:restaurants?|bars?)/i },
+  { label: "World's 50 Best", pattern: /world['']?s 50 best (?:restaurants?|bars?)/i },
+  { label: "James Beard",     pattern: /\bjames beard (?:award|nominee|finalist|semifinalist|winner)/i },
+  { label: "Tatler Best",     pattern: /\btatler['']?s? best (?:restaurants?|bars?|of)\b/i },
 ];
 
 interface RawPack {
@@ -137,63 +144,157 @@ export async function searchVenuesByVibe(vibe: string): Promise<SearchResult> {
   };
 }
 
+// Cap on how many queries we fire per recommendation — keeps ScraperAPI cost
+// bounded while still giving the recommender a varied pool.
+const MAX_QUERIES = 6;
+
+interface VibeTokens {
+  cuisineWord: string | null;     // user's literal word ("ramen"), not the canonical label
+  descriptors: string[];          // matched VIBE_DESCRIPTORS, in order
+  meal: "breakfast" | "brunch" | "lunch" | "dinner" | "drinks" | null;
+  occasion: "date" | "group" | "solo" | "family" | "work" | null;
+  activities: string[];           // coffee / art / nature / shop / nightlife
+  isRainy: boolean;
+}
+
+// Pull the literal token the user typed for cuisine (e.g. "ramen", "omakase")
+// rather than the canonical category label ("Japanese") — Google ranks better
+// when the query mirrors how people actually search.
+function extractCuisineWord(lower: string): string | null {
+  for (const def of CUISINE_DEFS) {
+    const m = lower.match(def.queryPattern);
+    if (m) return m[0].trim();
+  }
+  return null;
+}
+
+function extractTokens(lower: string): VibeTokens {
+  const descriptors = VIBE_DESCRIPTORS.filter((d) => lower.includes(d)).slice(0, 3);
+
+  const meal: VibeTokens["meal"] =
+    /\bbreakfast\b|\bearly\b/.test(lower)                  ? "breakfast" :
+    /\bbrunch\b/.test(lower)                                ? "brunch" :
+    /\blunch\b/.test(lower)                                 ? "lunch" :
+    /\bdinner\b|\bsupper\b/.test(lower)                     ? "dinner" :
+    /\bdrinks?\b|\bcocktails?\b|\bnightcap\b/.test(lower)   ? "drinks" :
+    null;
+
+  const occasion: VibeTokens["occasion"] =
+    /\bdate\b|romantic|partner|anniversary|girlfriend|boyfriend|\bgf\b|\bbf\b/.test(lower) ? "date" :
+    /\bgroup\b|barkada|friends|squad/.test(lower)                                          ? "group" :
+    /\bsolo\b|alone|by myself/.test(lower)                                                 ? "solo" :
+    /\bfamily\b|parents|kids|children/.test(lower)                                         ? "family" :
+    /\bwork\b|laptop|wifi|remote/.test(lower)                                              ? "work" :
+    null;
+
+  const activities: string[] = [];
+  if (/coffee|espresso|latte/.test(lower))            activities.push("specialty coffee");
+  if (/\bart\b|museum|gallery|exhibit/.test(lower))   activities.push("museums galleries");
+  if (/nature|outdoor|park|hike|trail/.test(lower))   activities.push("nature parks");
+  if (/shop|vintage|thrift|market|boutique/.test(lower)) activities.push("shops markets");
+  if (/\bclub\b|nightlife|party/.test(lower))         activities.push("nightlife");
+
+  return {
+    cuisineWord: extractCuisineWord(lower),
+    descriptors,
+    meal,
+    occasion,
+    activities,
+    isRainy: /rain|wet|stormy|typhoon|flood/.test(lower),
+  };
+}
+
+// Compose ScraperAPI queries from the user's actual words. The previous
+// version always led with "best <category> <region>" boilerplate, so the same
+// four results came back no matter what the user said. Now: cuisine, vibe
+// adjectives, meal, and occasion shape every query, and the broad baseline
+// only fires when the user gave nothing specific to anchor on.
 function buildQueries(vibe: string, area: string | null): string[] {
   const lower = vibe.toLowerCase();
-  const modifiers: string[] = [];
-
-  if (/date|romantic|partner/.test(lower)) modifiers.push("romantic");
-  if (/weird|unique|different|hidden/.test(lower)) modifiers.push("hidden gems unique");
-  if (/group|friends|barkada/.test(lower)) modifiers.push("group friendly");
-  if (/cheap|budget|affordable/.test(lower)) modifiers.push("affordable cheap eats");
-  if (/upscale|fancy|luxury/.test(lower)) modifiers.push("upscale fine dining");
-  if (/trending|popular|viral|hyped/.test(lower)) modifiers.push("trending popular");
-
-  const mod = modifiers.length ? modifiers.join(" ") + " " : "";
   const region = area ? AREA_QUERY_HINT[area] ?? area : "Metro Manila Philippines";
+  const t = extractTokens(lower);
+  const queries = new Set<string>();
 
-  // Always fire a broad baseline so the pool is never empty regardless of vibe.
-  const queries = new Set<string>([
-    `best ${mod}restaurants ${region}`,
-    `best ${mod}cafes ${region}`,
-    `best ${mod}bars ${region}`,
-    `things to do ${region}`,
-  ]);
+  const adj1 = t.descriptors[0] ?? "";
+  const adj2 = t.descriptors.slice(0, 2).join(" ");
 
-  if (/food|eat|hungry|foodie|brunch/.test(lower)) {
-    queries.add(`best ${mod}brunch spots ${region}`);
-  }
-  if (/bar|night|drink|cocktail|party/.test(lower)) {
-    queries.add(`best ${mod}cocktail bars ${region}`);
-  }
-  if (/coffee|cafe|chill/.test(lower)) {
-    queries.add(`best specialty coffee shops ${region}`);
-  }
-  if (/art|museum|culture|gallery/.test(lower)) {
-    queries.add(`best museums galleries ${region}`);
-  }
-  if (/nature|outdoor|park|escape|hike/.test(lower)) {
-    queries.add(`best parks nature spots ${region}`);
-  }
-  if (/shop|vintage|thrift|market/.test(lower)) {
-    queries.add(`best shops boutiques markets ${region}`);
-  }
-  if (/rain|wet|stormy|typhoon|indoor/.test(lower)) {
-    queries.add(`best indoor activities ${region}`);
+  // Cuisine = highest signal. Lead with the user's word, layer on descriptors
+  // and occasion as variants so we surface a range of matching venues.
+  if (t.cuisineWord) {
+    queries.add(`${t.cuisineWord} ${region}`.trim());
+    if (adj2)              queries.add(`${adj2} ${t.cuisineWord} ${region}`);
+    if (t.occasion === "date")  queries.add(`romantic ${t.cuisineWord} ${region}`);
+    if (t.occasion === "group") queries.add(`${t.cuisineWord} for groups ${region}`);
+    if (t.meal === "dinner")    queries.add(`${t.cuisineWord} dinner ${region}`);
+    if (t.meal === "lunch")     queries.add(`${t.cuisineWord} lunch ${region}`);
   }
 
-  return Array.from(queries);
+  // Meal-driven (covers cases without a cuisine — e.g. "looking for brunch")
+  if (t.meal === "brunch")    queries.add(`${adj1} brunch ${region}`.trim());
+  if (t.meal === "breakfast") queries.add(`${adj1} breakfast ${region}`.trim());
+  if (t.meal === "drinks") {
+    queries.add(`${adj1 || "cocktail"} bars ${region}`.trim());
+    queries.add(`speakeasy ${region}`);
+  }
+  if (t.meal === "dinner" && !t.cuisineWord) {
+    queries.add(`${adj2 || "dinner"} restaurants ${region}`.trim());
+  }
+  if (t.meal === "lunch" && !t.cuisineWord) {
+    queries.add(`${adj1} lunch spots ${region}`.trim());
+  }
+
+  // Descriptor-led — when the user gave vibes but no cuisine, search the vibe
+  // verbatim so Google returns places people actually describe that way.
+  if (!t.cuisineWord && t.descriptors.length > 0) {
+    queries.add(`${adj2 || adj1} restaurants ${region}`.trim());
+    queries.add(`${adj2 || adj1} ${region}`.trim());
+  }
+
+  // Occasion-driven (no cuisine context)
+  if (!t.cuisineWord) {
+    if (t.occasion === "date")   queries.add(`romantic date spots ${region}`);
+    if (t.occasion === "group")  queries.add(`group friendly restaurants ${region}`);
+    if (t.occasion === "family") queries.add(`family friendly restaurants ${region}`);
+    if (t.occasion === "work")   queries.add(`laptop friendly cafes ${region}`);
+  }
+
+  // Activity-driven — these are non-dining intents; fire them straight.
+  for (const act of t.activities) {
+    queries.add(`${adj1 ? adj1 + " " : ""}${act} ${region}`.trim());
+  }
+
+  // Weather context — rainy vibe → indoor cozy spots
+  if (t.isRainy) queries.add(`indoor cozy ${t.cuisineWord ?? "spots"} ${region}`.trim());
+
+  // Baseline floor — only when the user said nothing specific. This used to
+  // always fire and was the source of the "queries are always the same" feel.
+  if (queries.size === 0) {
+    queries.add(`restaurants ${region}`);
+    queries.add(`cafes ${region}`);
+    queries.add(`things to do ${region}`);
+  }
+
+  return Array.from(queries).slice(0, MAX_QUERIES);
 }
 
 const TYPE_KEYWORDS: { type: VenueType; words: string[] }[] = [
-  { type: "night",   words: ["bar", "pub", "club", "cocktail", "lounge", "speakeasy", "nightclub", "brewery"] },
+  { type: "night",   words: ["bar", "pub", "club", "cocktail", "lounge", "speakeasy", "nightclub", "brewery",
+                              "rooftop", "roofdeck", "roof deck", "skybar", "sky bar", "observatory",
+                              "penthouse", "tap room", "taproom", "wine bar", "whiskey bar"] },
   { type: "culture", words: ["museum", "gallery", "exhibit", "theater", "theatre", "heritage", "cultural"] },
   { type: "outdoor", words: ["park", "garden", "trail", "zoo", "farm", "nature reserve", "botanical"] },
   { type: "shop",    words: ["boutique", "vintage shop", "thrift", "market", "bazaar", "concept store"] },
   { type: "food",    words: ["restaurant", "cafe", "café", "coffee", "bakery", "eatery", "bistro", "diner",
                               "filipino", "japanese", "korean", "italian", "chinese", "thai", "vietnamese",
                               "mexican", "spanish", "french", "american", "fusion", "ramen", "sushi",
-                              "pizzeria", "bbq", "steakhouse", "seafood", "vegetarian", "vegan", "brunch"] },
+                              "pizzeria", "bbq", "steakhouse", "seafood", "vegetarian", "vegan", "brunch",
+                              "omakase", "kaiseki", "izakaya", "trattoria", "osteria"] },
 ];
+
+// Phrase-level signals that the venue is upscale; floors the cost estimate at
+// ₱2000 when ScraperAPI gave us no explicit price. Cuisine words alone don't
+// qualify — we need an explicit "fine dining" / "tasting menu" / etc.
+const UPSCALE_PATTERN = /\b(?:fine dining|tasting menu|omakase|kaiseki|degustation|prix fixe|chef['']?s table|set menu|wine pairing)\b/i;
 
 interface ParsedDetails {
   haystack: string;
@@ -213,14 +314,17 @@ function parseDetails(result: RawPack): ParsedDetails {
   });
 
   const haystack = stripped.join(" ").trim();
-  const priceLine = stripped.find((d) => /₱[\d,]/.test(d)) ?? "";
+  // Capture both explicit prices ("₱500–1,000") and tier indicators ("₱₱₱").
+  const priceLine = stripped.find((d) => /₱(?:[\d,]|₱)/.test(d)) ?? "";
   const quote = haystack.match(/"([^"]+)"/)?.[1] ?? "";
 
   return { haystack, priceLine, quote };
 }
 
-function inferType(haystack: string): VenueType {
-  const t = haystack.toLowerCase();
+function inferType(title: string, haystack: string): VenueType {
+  // Title is included so a venue called "Encima Roofdeck" wins as `night` even
+  // when its haystack mentions a nearby park / garden / etc.
+  const t = `${title} ${haystack}`.toLowerCase();
   for (const { type, words } of TYPE_KEYWORDS) {
     if (words.some((w) => t.includes(w))) return type;
   }
@@ -252,29 +356,86 @@ function inferVibes(raw: string, type: VenueType, price: string): Vibe[] {
   return [...new Set(vibes)];
 }
 
-function detectAwards(raw: string): string[] {
-  return AWARD_KEYWORDS.filter((kw) => raw.includes(kw)).map((kw) => {
-    const labels: Record<string, string> = {
-      "michelin": "Michelin",
-      "asia's 50 best": "Asia's 50 Best",
-      "world's 50 best": "World's 50 Best",
-      "50 best": "50 Best",
-      "bib gourmand": "Bib Gourmand",
-      "tatler": "Tatler Best",
-    };
-    return labels[kw] ?? kw;
-  });
+function detectAwards(haystack: string): string[] {
+  const found: string[] = [];
+  for (const { label, pattern } of AWARD_PATTERNS) {
+    if (pattern.test(haystack) && !found.includes(label)) found.push(label);
+  }
+  return found;
 }
 
-// Parse "₱500–1,000" → midpoint as PHP per person. Only digits AFTER ₱ count.
-function priceToCost(price: string, type: VenueType): number {
-  const m = price.match(/₱\s*([\d,]+)(?:\s*[–-]\s*([\d,]+))?/);
-  const fallback: Record<VenueType, number> = { food: 500, night: 700, culture: 200, outdoor: 100, shop: 400 };
-  if (!m) return fallback[type];
-  const lo = parseInt(m[1].replace(/,/g, ""), 10);
-  const hi = m[2] ? parseInt(m[2].replace(/,/g, ""), 10) : lo;
-  if (isNaN(lo)) return fallback[type];
-  return Math.round((lo + (isNaN(hi) ? lo : hi)) / 2);
+// Tier-indicator → midpoint cost. Calibrated to typical Metro Manila pricing.
+const TIER_COST: Record<number, number> = {
+  1: 250,   // ₱
+  2: 700,   // ₱₱
+  3: 1500,  // ₱₱₱
+  4: 3500,  // ₱₱₱₱
+};
+
+// Category fallbacks when neither an explicit price nor a tier indicator is
+// found. These are deliberately not low — a wrong-low cost lies to the user
+// AND lets the budget gate include venues that won't fit. `estimated: true`
+// is always set so the UI can label the figure as approximate.
+const FALLBACK_COST: Record<VenueType, number> = {
+  food:    800,
+  night:   1200,
+  culture: 300,
+  outdoor: 200,
+  shop:    500,
+};
+
+// Returns { cost, estimated }. `estimated: false` only when an explicit
+// "₱<digits>" amount was parsed; tier indicators, upscale-phrase floors, and
+// category fallbacks all flag as estimated.
+function priceToCost(priceLine: string, haystack: string, type: VenueType): { cost: number; estimated: boolean } {
+  const explicit = priceLine.match(/₱\s*([\d,]+)(?:\s*[–-]\s*([\d,]+))?/);
+  if (explicit) {
+    const lo = parseInt(explicit[1].replace(/,/g, ""), 10);
+    const hi = explicit[2] ? parseInt(explicit[2].replace(/,/g, ""), 10) : lo;
+    if (!isNaN(lo)) {
+      return { cost: Math.round((lo + (isNaN(hi) ? lo : hi)) / 2), estimated: false };
+    }
+  }
+
+  // Tier indicator: a run of "₱" symbols not followed by a digit. Search the
+  // priceLine first, then fall back to the full haystack.
+  const tierMatch = (priceLine.match(/(₱{1,4})(?!\d)/) ?? haystack.match(/(₱{1,4})(?!\d)/));
+  if (tierMatch) {
+    const tier = tierMatch[1].length as 1 | 2 | 3 | 4;
+    return { cost: TIER_COST[tier], estimated: true };
+  }
+
+  // Upscale-phrase floor: when the haystack explicitly calls out fine dining,
+  // tasting menus, omakase etc., the per-person price is almost always ₱2000+.
+  if (UPSCALE_PATTERN.test(haystack)) {
+    return { cost: 2000, estimated: true };
+  }
+
+  return { cost: FALLBACK_COST[type], estimated: true };
+}
+
+// Stable venue ID derived from the title alone, so the same venue gets the same
+// ID across separate ScraperAPI calls (search position changes between calls,
+// so position-based IDs broke the `exclude_ids` "ask for another" flow).
+function makeVenueId(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `v-${slug || "untitled"}`;
+}
+
+// Pull a real Instagram profile out of the haystack. Excludes post/reel/story
+// path segments so we don't link to a content URL by accident.
+const IG_PROFILE_BLOCKLIST = new Set(["p", "reel", "reels", "tv", "stories", "explore", "accounts", "direct"]);
+function extractInstagram(haystack: string): string | undefined {
+  const match = haystack.match(/instagram\.com\/([a-zA-Z0-9._]+)/i);
+  if (!match) return undefined;
+  const handle = match[1].replace(/[._]+$/, "");
+  if (handle.length < 3 || handle.length > 30) return undefined;
+  if (IG_PROFILE_BLOCKLIST.has(handle.toLowerCase())) return undefined;
+  return `https://instagram.com/${handle}`;
 }
 
 function defaultHours(type: VenueType): { opens: string; closes: string } {
@@ -300,16 +461,18 @@ function mapToVenue(result: RawPack, index: number): Venue | null {
 
   const { haystack, priceLine, quote } = parseDetails(result);
   const lower = haystack.toLowerCase();
-  const type = inferType(lower);
+  const type = inferType(result.title, lower);
   const blurb = quote || haystack.replace(/"[^"]*"/g, "").trim().slice(0, 140) || result.title;
+  const { cost, estimated } = priceToCost(priceLine, haystack, type);
 
   return {
-    id: `scraper-${result.position ?? index}-${result.title.slice(0, 12).replace(/\s/g, "")}`,
+    id: makeVenueId(result.title),
     name: result.title,
     area: inferAreaFromHaystack(haystack),
     type,
     vibe: inferVibes(lower, type, priceLine),
-    cost: priceToCost(priceLine, type),
+    cost,
+    costEstimated: estimated,
     duration: ({ culture: 120, outdoor: 120, night: 90, food: 75, shop: 90 } as Record<VenueType, number>)[type],
     ...defaultHours(type),
     weatherProof: type !== "outdoor",
@@ -318,6 +481,8 @@ function mapToVenue(result: RawPack, index: number): Venue | null {
     lng: 121.0244,
     rating: result.rating,
     reviewCount: normalizeReviewCount(result.rating_vote_count),
-    awards: detectAwards(lower),
+    awards: detectAwards(haystack),
+    instagram: extractInstagram(haystack),
+    haystack,
   };
 }
